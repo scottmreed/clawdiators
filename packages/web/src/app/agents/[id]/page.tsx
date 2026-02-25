@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 
 interface AgentProfile {
   id: string;
@@ -42,7 +43,25 @@ interface MatchSummary {
   completed_at: string | null;
 }
 
-export default async function FighterCardPage({
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const res = await apiFetch<AgentProfile>(`/api/v1/agents/${id}`);
+    if (res.ok) {
+      return {
+        title: `${res.data.name} (${res.data.elo} Elo) — Clawdiators`,
+        description: `Agent ${res.data.name}: ${res.data.title}, ${res.data.elo} Elo, ${res.data.match_count} matches.`,
+      };
+    }
+  } catch {}
+  return { title: "Agent — Clawdiators" };
+}
+
+export default async function AgentPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -72,46 +91,35 @@ export default async function FighterCardPage({
       : 0;
 
   return (
-    <div className="pt-16">
-      {/* Hero header */}
-      <section className="grid-bg">
-        <div className="mx-auto max-w-7xl px-6 pt-20 pb-16">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+    <div className="pt-14">
+      {/* Header */}
+      <div className="border-b border-border">
+        <div className="mx-auto max-w-7xl px-6 py-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-gold text-sm font-bold" style={{ fontFamily: "var(--font-display)" }}>
-                  {agent.title}
-                </span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-gold text-xs font-bold">{agent.title}</span>
                 {agent.claimed && (
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald/15 text-emerald border border-emerald/30">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald/15 text-emerald border border-emerald/30">
                     Claimed
                   </span>
                 )}
               </div>
-              <h1
-                className="text-4xl md:text-5xl font-extrabold"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {agent.name}
-              </h1>
-              {agent.tagline && (
-                <p className="mt-3 text-lg text-text-secondary italic">
-                  &ldquo;{agent.tagline}&rdquo;
-                </p>
-              )}
+              <h1 className="text-2xl font-bold">{agent.name}</h1>
+              <p className="text-[10px] text-text-muted mt-1">ID: {agent.id}</p>
               {agent.description && (
-                <p className="mt-2 text-text-secondary max-w-xl">
+                <p className="mt-2 text-sm text-text-secondary max-w-xl">
                   {agent.description}
                 </p>
               )}
-              <div className="mt-4 flex gap-4 text-sm text-text-muted">
+              <div className="mt-2 flex gap-2 text-xs text-text-muted">
                 {agent.base_model && (
-                  <span className="bg-bg-elevated px-3 py-1 rounded-md border border-border font-mono text-xs">
+                  <span className="bg-bg-elevated px-2 py-0.5 rounded border border-border">
                     {agent.base_model}
                   </span>
                 )}
                 {agent.moltbook_name && (
-                  <span className="bg-bg-elevated px-3 py-1 rounded-md border border-border text-xs">
+                  <span className="bg-bg-elevated px-2 py-0.5 rounded border border-border">
                     Moltbook: {agent.moltbook_name}
                   </span>
                 )}
@@ -119,21 +127,18 @@ export default async function FighterCardPage({
             </div>
 
             <div className="text-right shrink-0">
-              <div
-                className="text-6xl font-extrabold text-gold"
-                style={{ fontFamily: "var(--font-mono)" }}
-              >
+              <div className="text-4xl font-bold text-gold">
                 {agent.elo}
               </div>
-              <div className="text-sm text-text-muted mt-1">Elo Rating</div>
+              <div className="text-xs text-text-muted mt-0.5">Elo</div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-12 space-y-10">
+      <div className="mx-auto max-w-7xl px-6 py-8 space-y-8">
         {/* Stats grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           <StatBlock label="Matches" value={String(agent.match_count)} />
           <StatBlock
             label="Win Rate"
@@ -164,31 +169,25 @@ export default async function FighterCardPage({
 
         {/* Elo chart */}
         {agent.elo_history.length > 1 && (
-          <div className="card p-6">
-            <h2
-              className="text-sm font-bold uppercase tracking-[0.2em] text-text-muted mb-5"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+          <div className="card p-5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
               Elo Over Time
             </h2>
             <EloChart history={agent.elo_history} />
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4">
           {/* Titles */}
-          <div className="card p-6">
-            <h2
-              className="text-sm font-bold uppercase tracking-[0.2em] text-text-muted mb-5"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+          <div className="card p-5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
               Titles Earned
             </h2>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {agent.titles.map((t) => (
                 <span
                   key={t}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium border ${
+                  className={`px-2 py-1 rounded text-xs border ${
                     t === agent!.title
                       ? "bg-gold/15 text-gold border-gold/30 font-bold"
                       : "bg-bg-elevated text-text-secondary border-border"
@@ -201,31 +200,28 @@ export default async function FighterCardPage({
           </div>
 
           {/* Rivals */}
-          <div className="card p-6">
-            <h2
-              className="text-sm font-bold uppercase tracking-[0.2em] text-text-muted mb-5"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
+          <div className="card p-5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
               Rivals
             </h2>
             {agent.rivals.length === 0 ? (
-              <p className="text-text-muted text-sm">
-                No rivalries yet. Fight the same opponent 3+ times to forge one.
+              <p className="text-text-muted text-xs">
+                No rivalries yet. 3+ bouts against the same opponent forges one.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {agent.rivals.map((r) => (
                   <a
                     key={r.agentId}
                     href={`/agents/${r.agentId}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-bg hover:bg-bg-elevated transition-colors"
+                    className="flex items-center justify-between p-2 rounded bg-bg hover:bg-bg-elevated transition-colors text-sm"
                   >
-                    <span className="font-medium">{r.name}</span>
-                    <span className="text-xs" style={{ fontFamily: "var(--font-mono)" }}>
+                    <span className="font-bold">{r.name}</span>
+                    <span className="text-xs">
                       <span className="text-emerald">{r.wins}W</span>
                       <span className="text-text-muted mx-1">/</span>
                       <span className="text-coral">{r.losses}L</span>
-                      <span className="text-text-muted ml-2">({r.bouts})</span>
+                      <span className="text-text-muted ml-1.5">({r.bouts})</span>
                     </span>
                   </a>
                 ))}
@@ -235,39 +231,35 @@ export default async function FighterCardPage({
         </div>
 
         {/* Match History */}
-        <div className="card p-6">
-          <h2
-            className="text-sm font-bold uppercase tracking-[0.2em] text-text-muted mb-5"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
+        <div className="card p-5">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
             Match History
           </h2>
           {matches.length === 0 ? (
-            <p className="text-text-muted text-sm">No matches yet.</p>
+            <p className="text-text-muted text-xs">No matches yet.</p>
           ) : (
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               {matches.map((m) => (
                 <a
                   key={m.id}
                   href={`/matches/${m.id}`}
-                  className="flex items-center justify-between px-4 py-3 rounded-lg bg-bg hover:bg-bg-elevated transition-colors group"
+                  className="flex items-center justify-between px-3 py-2 rounded bg-bg hover:bg-bg-elevated transition-colors group"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <ResultDot result={m.result} />
-                    <span className="font-medium text-sm group-hover:text-coral transition-colors">
+                    <span className="font-bold text-sm group-hover:text-coral transition-colors">
                       {m.bout_name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     {m.score !== null && (
-                      <span className="font-bold text-sm text-gold" style={{ fontFamily: "var(--font-mono)" }}>
+                      <span className="font-bold text-sm text-gold">
                         {m.score}
                       </span>
                     )}
                     {m.elo_change !== null && m.elo_change !== 0 && (
                       <span
                         className={`text-xs font-bold ${m.elo_change > 0 ? "text-emerald" : "text-coral"}`}
-                        style={{ fontFamily: "var(--font-mono)" }}
                       >
                         {m.elo_change > 0 ? "+" : ""}{m.elo_change}
                       </span>
@@ -278,6 +270,16 @@ export default async function FighterCardPage({
             </div>
           )}
         </div>
+
+        {/* Raw JSON toggle */}
+        <details className="card">
+          <summary className="px-5 py-3 text-xs font-bold text-text-muted cursor-pointer hover:text-text transition-colors">
+            Raw Agent Data (JSON)
+          </summary>
+          <pre className="px-5 pb-4 text-xs text-text-secondary overflow-x-auto whitespace-pre-wrap">
+            {JSON.stringify(agent, null, 2)}
+          </pre>
+        </details>
       </div>
     </div>
   );
@@ -294,11 +296,11 @@ function StatBlock({
 }) {
   const cls = color === "emerald" ? "text-emerald" : color === "coral" ? "text-coral" : color === "gold" ? "text-gold" : "text-text";
   return (
-    <div className="card px-4 py-5 text-center">
-      <div className={`text-xl font-bold ${cls}`} style={{ fontFamily: "var(--font-mono)" }}>
+    <div className="card px-3 py-4 text-center">
+      <div className={`text-lg font-bold ${cls}`}>
         {value}
       </div>
-      <div className="text-xs text-text-muted mt-1.5 uppercase tracking-wider">
+      <div className="text-[10px] text-text-muted mt-1 uppercase tracking-wider">
         {label}
       </div>
     </div>
@@ -308,7 +310,7 @@ function StatBlock({
 function ResultDot({ result }: { result: string | null }) {
   if (!result) return <span className="w-2 h-2 rounded-full bg-text-muted" />;
   const cls = result === "win" ? "bg-emerald" : result === "loss" ? "bg-coral" : "bg-gold";
-  return <span className={`w-2.5 h-2.5 rounded-full ${cls}`} />;
+  return <span className={`w-2 h-2 rounded-full ${cls}`} />;
 }
 
 function EloChart({
@@ -331,7 +333,6 @@ function EloChart({
     })
     .join(" ");
 
-  // Area fill
   const areaPoints = `0,${h} ${points} ${w},${h}`;
 
   return (
@@ -353,7 +354,7 @@ function EloChart({
           </linearGradient>
         </defs>
       </svg>
-      <div className="flex justify-between text-xs text-text-muted mt-2" style={{ fontFamily: "var(--font-mono)" }}>
+      <div className="flex justify-between text-[10px] text-text-muted mt-1">
         <span>{Math.round(min + 20)}</span>
         <span>{Math.round(max - 20)}</span>
       </div>

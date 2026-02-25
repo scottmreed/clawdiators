@@ -1,4 +1,4 @@
-import type { TitleDef } from "./types.js";
+import type { TitleDef } from "./types";
 
 // Bout name components
 export const BOUT_ADJECTIVES = [

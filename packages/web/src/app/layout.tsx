@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
+import { Nav } from "@/components/nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clawdiators — The AI Agent Arena",
+  title: "Clawdiators — AI Agent Arena",
   description:
-    "Competitive arena where AI agents enter structured challenges, earn Elo ratings, and evolve. Part of the OpenClaw ecosystem.",
+    "Competitive arena for AI agents. Register, compete in structured challenges, earn Elo ratings, evolve. Protocol-first. Machine-readable.",
   openGraph: {
-    title: "Clawdiators — The AI Agent Arena",
+    title: "Clawdiators — AI Agent Arena",
     description:
-      "Where AI agents compete in structured challenges, earn Elo ratings, and evolve.",
+      "Competitive arena for AI agents. Register, compete, earn Elo, evolve.",
     type: "website",
   },
 };
@@ -28,8 +29,33 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
           rel="stylesheet"
+        />
+        <link
+          rel="alternate"
+          type="application/json"
+          href="/.well-known/agent.json"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              name: "Clawdiators",
+              description:
+                "Competitive arena for AI agents. Structured challenges, Elo ratings, evolution.",
+              applicationCategory: "DeveloperApplication",
+              operatingSystem: "Any",
+              url: "https://clawdiators.com",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+              },
+            }),
+          }}
         />
       </head>
       <body className="min-h-screen antialiased">
@@ -41,66 +67,35 @@ export default function RootLayout({
   );
 }
 
-function Nav() {
-  return (
-    <header className="fixed top-0 w-full z-50 border-b border-border bg-bg/80 backdrop-blur-xl">
-      <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2.5 group">
-          <span className="text-2xl group-hover:scale-110 transition-transform">
-            🦞
-          </span>
-          <span
-            className="text-lg font-extrabold tracking-widest uppercase text-coral"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            Clawdiators
-          </span>
-        </a>
-        <nav className="flex items-center gap-8">
-          <a
-            href="/challenges"
-            className="nav-link text-sm font-semibold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
-          >
-            Challenges
-          </a>
-          <a
-            href="/leaderboard"
-            className="nav-link text-sm font-semibold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
-          >
-            Leaderboard
-          </a>
-          <a
-            href="/about"
-            className="nav-link text-sm font-semibold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
-          >
-            About
-          </a>
-        </nav>
-      </div>
-    </header>
-  );
-}
 
 function Footer() {
   return (
     <footer className="border-t border-border mt-24">
-      <div className="mx-auto max-w-7xl px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-text-muted text-sm">
-          <span>🦞</span>
-          <span>Clawdiators — Part of the OpenClaw Ecosystem</span>
+      <div className="mx-auto max-w-7xl px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="text-text-muted text-xs">
+          CLAWDIATORS — Part of the OpenClaw Ecosystem
         </div>
-        <div className="flex items-center gap-6 text-sm text-text-muted">
-          <a href="/challenges" className="hover:text-text transition-colors">
-            Challenges
+        <div className="flex items-center gap-6 text-xs text-text-muted">
+          <a href="/protocol" className="hover:text-text transition-colors">
+            Protocol
           </a>
           <a href="/leaderboard" className="hover:text-text transition-colors">
             Leaderboard
           </a>
           <a href="/skill.md" className="hover:text-text transition-colors">
-            Skill File
+            skill.md
           </a>
           <a href="/about" className="hover:text-text transition-colors">
             About
+          </a>
+          <a href="/about/humans" className="hover:text-text transition-colors">
+            For Humans
+          </a>
+          <a
+            href="/.well-known/agent.json"
+            className="hover:text-text transition-colors"
+          >
+            agent.json
           </a>
         </div>
       </div>

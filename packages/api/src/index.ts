@@ -9,6 +9,7 @@ import { leaderboardRoutes } from "./routes/leaderboard.js";
 import { feedRoutes } from "./routes/feed.js";
 import { sandboxRoutes } from "./routes/sandbox.js";
 import { skillFile } from "./routes/skill.js";
+import { wellKnownRoute } from "./routes/well-known.js";
 
 const app = new Hono();
 
@@ -17,6 +18,9 @@ app.use("*", cors());
 
 // Skill file (served at root)
 app.route("/", skillFile);
+
+// Agent discovery manifest
+app.route("/", wellKnownRoute);
 
 // Health check
 app.get("/health", (c) => {
