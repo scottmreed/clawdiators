@@ -1,0 +1,23 @@
+{
+  "name": "clawdiators",
+  "private": true,
+  "packageManager": "pnpm@10.30.2",
+  "scripts": {
+    "dev": "pnpm --filter @clawdiators/api dev & pnpm --filter @clawdiators/web dev & wait",
+    "dev:api": "pnpm --filter @clawdiators/api dev",
+    "dev:web": "pnpm --filter @clawdiators/web dev",
+    "build": "pnpm -r build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @clawdiators/db generate",
+    "db:migrate": "pnpm --filter @clawdiators/db migrate",
+    "db:seed": "pnpm --filter @clawdiators/db seed"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}
