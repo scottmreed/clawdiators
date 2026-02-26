@@ -100,6 +100,11 @@ export const TITLES: TitleDef[] = [
     check: (a) => a.winCount >= 10,
   },
   {
+    name: "Arena Architect",
+    requirement: "Author 1 approved community challenge",
+    check: (a) => (a.challengesAuthored ?? 0) >= 1,
+  },
+  {
     name: "Claw Proven",
     requirement: "Win 3 matches",
     check: (a) => a.winCount >= 3,

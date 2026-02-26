@@ -105,6 +105,90 @@ export const REEF_REFACTOR_DIMENSIONS: ScoringDimension[] = [
   { key: "coverage", label: "Coverage", weight: 0.15, description: "Percentage of functions attempted", color: "purple" },
 ];
 
+export const SWITCHBOARD_DIMENSIONS: ScoringDimension[] = [
+  { key: "accuracy", label: "Accuracy", weight: 0.4, description: "Correctness of answers vs ground truth", color: "emerald" },
+  { key: "source_selection", label: "Source Selection", weight: 0.3, description: "Choosing the most authoritative data source", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const RATE_LIMITED_RECON_DIMENSIONS: ScoringDimension[] = [
+  { key: "completeness", label: "Completeness", weight: 0.4, description: "Dossier completeness per target citizen", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.2, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.25, description: "API call economy", color: "gold" },
+  { key: "planning", label: "Planning", weight: 0.15, description: "Avoiding rate limit violations", color: "purple" },
+];
+
+export const DEPTH_FIRST_GEN_DIMENSIONS: ScoringDimension[] = [
+  { key: "correctness", label: "Correctness", weight: 0.5, description: "Correct outputs for hidden test cases", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.2, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+  { key: "coverage", label: "Coverage", weight: 0.15, description: "Percentage of test cases attempted", color: "purple" },
+];
+
+export const ARCHIVE_DIVE_DIMENSIONS: ScoringDimension[] = [
+  { key: "accuracy", label: "Accuracy", weight: 0.45, description: "Correctness of cross-document synthesis answers", color: "emerald" },
+  { key: "comprehensiveness", label: "Comprehensiveness", weight: 0.25, description: "Evidence citations and document coverage", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const CONTRACT_REVIEW_DIMENSIONS: ScoringDimension[] = [
+  { key: "precision", label: "Precision", weight: 0.35, description: "Reported issues that are actual issues", color: "emerald" },
+  { key: "recall", label: "Recall", weight: 0.35, description: "Fraction of planted issues found", color: "coral" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const CORAL_CENSUS_DIMENSIONS: ScoringDimension[] = [
+  { key: "accuracy", label: "Accuracy", weight: 0.4, description: "Correctness of final population counts", color: "emerald" },
+  { key: "state_mgmt", label: "State Mgmt", weight: 0.3, description: "Checkpoint accuracy at each batch interval", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const SUPPLY_CHAIN_DIMENSIONS: ScoringDimension[] = [
+  { key: "profit", label: "Profit", weight: 0.35, description: "Total profit vs optimal strategy", color: "emerald" },
+  { key: "fulfillment", label: "Fulfillment", weight: 0.3, description: "Order fulfillment rate", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.2, description: "Decision quality per period", color: "gold" },
+];
+
+export const CHART_FORENSICS_DIMENSIONS: ScoringDimension[] = [
+  { key: "precision", label: "Precision", weight: 0.35, description: "Reported discrepancies that are actual misrepresentations", color: "emerald" },
+  { key: "recall", label: "Recall", weight: 0.35, description: "Fraction of planted misrepresentations found", color: "coral" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const CARTOGRAPHERS_EYE_DIMENSIONS: ScoringDimension[] = [
+  { key: "accuracy", label: "Accuracy", weight: 0.45, description: "Correctness of spatial reasoning answers", color: "emerald" },
+  { key: "spatial_reasoning", label: "Spatial Reasoning", weight: 0.25, description: "Quality of distance and direction analysis", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const BLUEPRINT_AUDIT_DIMENSIONS: ScoringDimension[] = [
+  { key: "precision", label: "Precision", weight: 0.35, description: "Reported violations that are actual violations", color: "emerald" },
+  { key: "recall", label: "Recall", weight: 0.35, description: "Fraction of planted violations found", color: "coral" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const ADVERSARIAL_INTERVIEW_DIMENSIONS: ScoringDimension[] = [
+  { key: "discernment", label: "Discernment", weight: 0.45, description: "Identifying false premises and acknowledging ambiguity", color: "purple" },
+  { key: "accuracy", label: "Accuracy", weight: 0.25, description: "Correctness of straightforward answers", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
+export const THE_MIRAGE_DIMENSIONS: ScoringDimension[] = [
+  { key: "detection", label: "Detection", weight: 0.45, description: "Identifying fabricated data points across sources", color: "purple" },
+  { key: "precision", label: "Precision", weight: 0.25, description: "Reported fabrications that are actual fabrications", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "efficiency", label: "Efficiency", weight: 0.15, description: "API call economy", color: "gold" },
+];
+
 // Category color map for web UI
 export const CATEGORY_COLORS: Record<string, string> = {
   calibration: "emerald",

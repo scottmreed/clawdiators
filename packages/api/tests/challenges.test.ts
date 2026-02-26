@@ -13,6 +13,30 @@ import { generateLogicData } from "../src/challenges/logic-reef/data.js";
 import { scoreLogic } from "../src/challenges/logic-reef/scorer.js";
 import { generateRefactorData } from "../src/challenges/reef-refactor/data.js";
 import { scoreRefactor } from "../src/challenges/reef-refactor/scorer.js";
+import { generateSwitchboardData } from "../src/challenges/switchboard/data.js";
+import { scoreSwitchboard } from "../src/challenges/switchboard/scorer.js";
+import { generateReconData } from "../src/challenges/rate-limited-recon/data.js";
+import { scoreRecon } from "../src/challenges/rate-limited-recon/scorer.js";
+import { generateDepthFirstData } from "../src/challenges/depth-first-gen/data.js";
+import { scoreDepthFirst } from "../src/challenges/depth-first-gen/scorer.js";
+import { generateArchiveData } from "../src/challenges/archive-dive/data.js";
+import { scoreArchive } from "../src/challenges/archive-dive/scorer.js";
+import { generateContractData } from "../src/challenges/contract-review/data.js";
+import { scoreContract } from "../src/challenges/contract-review/scorer.js";
+import { generateCensusData } from "../src/challenges/coral-census/data.js";
+import { scoreCensus } from "../src/challenges/coral-census/scorer.js";
+import { generateSupplyChainData } from "../src/challenges/supply-chain/data.js";
+import { scoreSupplyChain } from "../src/challenges/supply-chain/scorer.js";
+import { generateForensicsData } from "../src/challenges/chart-forensics/data.js";
+import { scoreForensics } from "../src/challenges/chart-forensics/scorer.js";
+import { generateCartographerData } from "../src/challenges/cartographers-eye/data.js";
+import { scoreCartographer } from "../src/challenges/cartographers-eye/scorer.js";
+import { generateBlueprintData } from "../src/challenges/blueprint-audit/data.js";
+import { scoreBlueprint } from "../src/challenges/blueprint-audit/scorer.js";
+import { generateInterviewData } from "../src/challenges/adversarial-interview/data.js";
+import { scoreInterview } from "../src/challenges/adversarial-interview/scorer.js";
+import { generateMirageData } from "../src/challenges/the-mirage/data.js";
+import { scoreMirage } from "../src/challenges/the-mirage/scorer.js";
 
 // ── Cascading Failure ────────────────────────────────────────────────
 
@@ -528,5 +552,608 @@ describe("Reef Refactor scoring", () => {
     });
     expect(r.breakdown.correctness).toBe(0);
     expect(r.breakdown.coverage).toBe(0);
+  });
+});
+
+// ── Switchboard ────────────────────────────────────────────────────
+
+describe("Switchboard data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateSwitchboardData(42);
+    const d2 = generateSwitchboardData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.census).toEqual(d2.census);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateSwitchboardData(42);
+    const d2 = generateSwitchboardData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("Switchboard scoring", () => {
+  const data = generateSwitchboardData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = ans.answer;
+    }
+    const r = scoreSwitchboard({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 5,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = ans.answer;
+    }
+    const r = scoreSwitchboard({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 4,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Rate-Limited Recon ─────────────────────────────────────────────
+
+describe("Rate-Limited Recon data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateReconData(42);
+    const d2 = generateReconData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.citizens).toEqual(d2.citizens);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateReconData(42);
+    const d2 = generateReconData(99);
+    expect(d1.groundTruth.targets[0].citizen_id).not.toBe(d2.groundTruth.targets[0].citizen_id);
+  });
+});
+
+describe("Rate-Limited Recon scoring", () => {
+  const data = generateReconData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const dossiers = gt.targets.map((t) => ({
+      citizen_id: t.citizen_id,
+      name: t.name,
+      properties: t.properties,
+      total_property_value: t.total_property_value,
+      vehicle_count: t.vehicle_count,
+      vehicles: t.vehicles,
+    }));
+    const r = scoreRecon({
+      submission: { dossiers, rate_limit_hits: 0 }, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 6,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = { targets: [], rate_limit_hits: 0 };
+    const r = scoreRecon({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 3,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Depth-First Generation ─────────────────────────────────────────
+
+describe("Depth-First Gen data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateDepthFirstData(42);
+    const d2 = generateDepthFirstData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.spec).toEqual(d2.spec);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateDepthFirstData(42);
+    const d2 = generateDepthFirstData(99);
+    const gt1 = JSON.stringify(d1.groundTruth);
+    const gt2 = JSON.stringify(d2.groundTruth);
+    expect(gt1).not.toBe(gt2);
+  });
+});
+
+describe("Depth-First Gen scoring", () => {
+  const data = generateDepthFirstData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub: Record<string, unknown> = {};
+    for (const t of gt.test_outputs) {
+      sub[t.id] = t.expected_output;
+    }
+    const r = scoreDepthFirst({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 1,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = {};
+    for (const t of gt.test_outputs) {
+      sub[t.id] = t.expected_output;
+    }
+    const r = scoreDepthFirst({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 1,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Archive Dive ───────────────────────────────────────────────────
+
+describe("Archive Dive data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateArchiveData(42);
+    const d2 = generateArchiveData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.documents).toEqual(d2.documents);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateArchiveData(42);
+    const d2 = generateArchiveData(99);
+    expect(d1.documents[0].title).not.toBe(d2.documents[0].title);
+  });
+});
+
+describe("Archive Dive scoring", () => {
+  const data = generateArchiveData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = ans.answer;
+      sub[`${ans.question_id}_evidence`] = ans.evidence;
+    }
+    const r = scoreArchive({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 10,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = ans.answer;
+      sub[`${ans.question_id}_evidence`] = ans.evidence;
+    }
+    const r = scoreArchive({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 5,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Contract Review ────────────────────────────────────────────────
+
+describe("Contract Review data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateContractData(42);
+    const d2 = generateContractData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.sections).toEqual(d2.sections);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateContractData(42);
+    const d2 = generateContractData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("Contract Review scoring", () => {
+  const data = generateContractData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      issues: gt.issues.map((i) => ({
+        type: i.type,
+        section_ids: i.section_ids,
+        description: i.description,
+      })),
+    };
+    const r = scoreContract({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 10,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      issues: gt.issues.map((i) => ({
+        type: i.type,
+        section_ids: i.section_ids,
+        description: i.description,
+      })),
+    };
+    const r = scoreContract({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 5,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Coral Census ───────────────────────────────────────────────────
+
+describe("Coral Census data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateCensusData(42);
+    const d2 = generateCensusData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.batches).toEqual(d2.batches);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateCensusData(42);
+    const d2 = generateCensusData(99);
+    expect(d1.groundTruth.total_final_population).not.toBe(d2.groundTruth.total_final_population);
+  });
+});
+
+describe("Coral Census scoring", () => {
+  const data = generateCensusData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer with checkpoints gets high score", () => {
+    const cps = gt.batch_populations.map((bp) => ({ data: { populations: bp } }));
+    const r = scoreCensus({
+      submission: { populations: gt.final_populations, total: gt.total_final_population },
+      groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000),
+      apiCallCount: 6, checkpoints: cps,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const cps = gt.batch_populations.map((bp) => ({ data: { populations: bp } }));
+    const r = scoreCensus({
+      submission: { populations: gt.final_populations, total: gt.total_final_population },
+      groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 5000),
+      apiCallCount: 6, checkpoints: cps,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Supply Chain Marathon ──────────────────────────────────────────
+
+describe("Supply Chain Marathon data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateSupplyChainData(42);
+    const d2 = generateSupplyChainData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.products).toEqual(d2.products);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateSupplyChainData(42);
+    const d2 = generateSupplyChainData(99);
+    expect(d1.groundTruth.optimal_profit).not.toBe(d2.groundTruth.optimal_profit);
+  });
+});
+
+describe("Supply Chain Marathon scoring", () => {
+  const data = generateSupplyChainData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const r = scoreSupplyChain({
+      submission: { profit: gt.optimal_profit, fulfillment_ratio: gt.optimal_fulfillment },
+      groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 600000),
+      apiCallCount: 30,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const r = scoreSupplyChain({
+      submission: { profit: gt.optimal_profit, fulfillment_ratio: gt.optimal_fulfillment },
+      groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000),
+      apiCallCount: 30,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Chart Forensics ────────────────────────────────────────────────
+
+describe("Chart Forensics data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateForensicsData(42);
+    const d2 = generateForensicsData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.tables).toEqual(d2.tables);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateForensicsData(42);
+    const d2 = generateForensicsData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("Chart Forensics scoring", () => {
+  const data = generateForensicsData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      issues: gt.issues.map((i) => ({
+        chart_id: i.chart_id,
+        issue_type: i.issue_type,
+        description: i.description,
+      })),
+    };
+    const r = scoreForensics({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 3,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      issues: gt.issues.map((i) => ({
+        chart_id: i.chart_id,
+        issue_type: i.issue_type,
+        description: i.description,
+      })),
+    };
+    const r = scoreForensics({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 2,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Cartographer's Eye ─────────────────────────────────────────────
+
+describe("Cartographer's Eye data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateCartographerData(42);
+    const d2 = generateCartographerData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.regions).toEqual(d2.regions);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateCartographerData(42);
+    const d2 = generateCartographerData(99);
+    expect(d1.regions[0].center_x).not.toBe(d2.regions[0].center_x);
+  });
+});
+
+describe("Cartographer's Eye scoring", () => {
+  const data = generateCartographerData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = String(ans.answer);
+    }
+    sub.reasoning = { q1: "By distance calculation", q2: "Measured coordinates", q3: "BFS path", q4: "Compared radii", q5: "atan2 compass" };
+    const r = scoreCartographer({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 3,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = {};
+    for (const ans of gt.answers) {
+      sub[ans.question_id] = String(ans.answer);
+    }
+    sub.reasoning = { q1: "calc", q2: "calc", q3: "calc", q4: "calc", q5: "calc" };
+    const r = scoreCartographer({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 2,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Blueprint Audit ────────────────────────────────────────────────
+
+describe("Blueprint Audit data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateBlueprintData(42);
+    const d2 = generateBlueprintData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.blueprints).toEqual(d2.blueprints);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateBlueprintData(42);
+    const d2 = generateBlueprintData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("Blueprint Audit scoring", () => {
+  const data = generateBlueprintData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      violations: gt.violations.map((v) => ({
+        blueprint_id: v.blueprint_id,
+        violation_type: v.violation_type,
+        rule_id: v.rule_id,
+        location: v.location,
+        description: v.description,
+      })),
+    };
+    const r = scoreBlueprint({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 5,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      violations: gt.violations.map((v) => ({
+        blueprint_id: v.blueprint_id,
+        violation_type: v.violation_type,
+        rule_id: v.rule_id,
+        location: v.location,
+        description: v.description,
+      })),
+    };
+    const r = scoreBlueprint({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 3,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Adversarial Interview ──────────────────────────────────────────
+
+describe("Adversarial Interview data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateInterviewData(42);
+    const d2 = generateInterviewData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.questions).toEqual(d2.questions);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateInterviewData(42);
+    const d2 = generateInterviewData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("Adversarial Interview scoring", () => {
+  const data = generateInterviewData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub: Record<string, unknown> = {};
+    for (const q of gt.questions) {
+      if (q.type === "straightforward") {
+        sub[q.id] = q.correct_answer;
+      } else if (q.type === "false_premise") {
+        sub[q.id] = "This question contains a false premise. " + q.correct_answer;
+      } else {
+        sub[q.id] = "This question is ambiguous. " + q.correct_answer;
+      }
+    }
+    const r = scoreInterview({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 2,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub: Record<string, unknown> = {};
+    for (const q of gt.questions) {
+      if (q.type === "straightforward") {
+        sub[q.id] = q.correct_answer;
+      } else if (q.type === "false_premise") {
+        sub[q.id] = "This question contains a false premise. " + q.correct_answer;
+      } else {
+        sub[q.id] = "This question is ambiguous. " + q.correct_answer;
+      }
+    }
+    const r = scoreInterview({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 1,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── The Mirage ─────────────────────────────────────────────────────
+
+describe("The Mirage data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateMirageData(42);
+    const d2 = generateMirageData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.census).toEqual(d2.census);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateMirageData(42);
+    const d2 = generateMirageData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+});
+
+describe("The Mirage scoring", () => {
+  const data = generateMirageData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      fabrications: gt.fabrications.map((f) => ({
+        district: f.district,
+        field: f.field,
+        source: f.source,
+        explanation: f.explanation,
+      })),
+    };
+    const r = scoreMirage({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 5,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      fabrications: gt.fabrications.map((f) => ({
+        district: f.district,
+        field: f.field,
+        source: f.source,
+        explanation: f.explanation,
+      })),
+    };
+    const r = scoreMirage({
+      submission: sub as any, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 3,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
   });
 });

@@ -119,5 +119,6 @@ export interface TitleDef {
     winCount: number;
     elo: number;
     bestStreak: number;
+    challengesAuthored?: number;
   }) => boolean;
 }

@@ -64,6 +64,7 @@ export function computeTitle(agent: {
   winCount: number;
   elo: number;
   bestStreak: number;
+  challengesAuthored?: number;
 }): string {
   for (const title of TITLES) {
     if (title.check(agent)) {
@@ -81,6 +82,7 @@ export function computeAllTitles(agent: {
   winCount: number;
   elo: number;
   bestStreak: number;
+  challengesAuthored?: number;
 }): string[] {
   const earned: string[] = [];
   for (const title of TITLES) {
