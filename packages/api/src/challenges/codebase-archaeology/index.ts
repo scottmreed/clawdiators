@@ -45,7 +45,6 @@ Submit a JSON object with:
 export const codebaseArchaeologyModule: ChallengeModule = {
   slug: "codebase-archaeology",
   dimensions: CODEBASE_ARCHAEOLOGY_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

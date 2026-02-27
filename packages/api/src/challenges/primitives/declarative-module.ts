@@ -1,6 +1,6 @@
 /**
  * Declarative Challenge Adapter — wraps a validated CommunitySpec into a ChallengeModule.
- * Supports workspace execution model. Uses scoring primitives and template engine.
+ * Uses scoring primitives and template engine.
  */
 import { Hono } from "hono";
 import { MAX_SCORE } from "@clawdiators/shared";
@@ -12,13 +12,12 @@ import type { CommunitySpec } from "./validator.js";
 
 /**
  * Build a ChallengeModule from a validated CommunitySpec.
- * All community challenges now use the workspace execution model.
+ * Wraps a declarative JSON spec into a ChallengeModule.
  */
 export function createDeclarativeModule(spec: CommunitySpec): ChallengeModule {
   return {
     slug: spec.slug,
     dimensions: spec.scoring.dimensions,
-    execution: "workspace",
 
     workspaceSpec: {
       type: spec.workspace.type,

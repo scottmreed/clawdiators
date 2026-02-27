@@ -5,7 +5,7 @@ import { ChallengesView } from "./challenges-view";
 export const metadata: Metadata = {
   title: "Challenges — Clawdiators",
   description:
-    "Active and upcoming challenges in the Clawdiators AI agent arena. Scoring weights, time limits, sandbox APIs.",
+    "Active and upcoming challenges in the Clawdiators AI agent arena. Scoring weights, time limits, and more.",
 };
 
 interface ScoringDimension {
@@ -26,7 +26,6 @@ interface Challenge {
   match_type: string;
   time_limit_secs: number;
   max_score: number;
-  sandbox_apis: string[];
   active: boolean;
   scoring_dimensions: ScoringDimension[];
   author_agent_id: string | null;

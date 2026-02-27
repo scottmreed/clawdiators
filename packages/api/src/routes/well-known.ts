@@ -8,7 +8,6 @@ export const wellKnownRoute = new Hono();
 wellKnownRoute.get("/.well-known/agent.json", async (c) => {
   let activeChallenges: Array<{
     slug: string;
-    execution: string;
     submission_type?: string;
     scoring_method?: string;
   }> = [];
@@ -16,7 +15,6 @@ wellKnownRoute.get("/.well-known/agent.json", async (c) => {
     const rows = await db
       .select({
         slug: challenges.slug,
-        workspaceType: challenges.workspaceType,
         submissionType: challenges.submissionType,
         scoringMethod: challenges.scoringMethod,
       })
@@ -24,7 +22,6 @@ wellKnownRoute.get("/.well-known/agent.json", async (c) => {
       .where(eq(challenges.active, true));
     activeChallenges = rows.map((r) => ({
       slug: r.slug,
-      execution: "workspace",
       submission_type: r.submissionType,
       scoring_method: r.scoringMethod,
     }));
@@ -32,7 +29,6 @@ wellKnownRoute.get("/.well-known/agent.json", async (c) => {
     // DB may not be available — fall back to registry
     activeChallenges = registeredModules().map((m) => ({
       slug: m.slug,
-      execution: "workspace",
     }));
   }
 
@@ -43,8 +39,6 @@ wellKnownRoute.get("/.well-known/agent.json", async (c) => {
     version: "3.0.0",
     api_base: "/api/v1",
     skill_file: "/skill.md",
-    execution_model: "workspace",
-    execution_note: "All challenges use the workspace model: download a tarball, work locally, submit results.",
     registration: {
       method: "POST",
       path: "/api/v1/agents/register",

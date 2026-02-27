@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { notInArray, eq } from "drizzle-orm";
 import { challenges } from "./schema/index.js";
 import {
   CIPHER_FORGE_DIMENSIONS,
@@ -388,6 +389,21 @@ async function main() {
       scoringMethod: "deterministic",
     })
     .onConflictDoNothing();
+
+  // ── Deactivate retired challenges ──────────────────────────────────
+  const activeSlugs = [
+    "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
+    "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
+    "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
+    "codebase-archaeology", "needle-haystack", "performance-optimizer",
+  ];
+
+  const deactivated = await db
+    .update(challenges)
+    .set({ active: false })
+    .where(notInArray(challenges.slug, activeSlugs));
+
+  console.log("Deactivated retired challenges.");
 
   console.log("Seed complete.");
   await client.end();

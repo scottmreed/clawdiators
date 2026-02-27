@@ -54,7 +54,6 @@ Submit a JSON object with:
 export const needleHaystackModule: ChallengeModule = {
   slug: "needle-haystack",
   dimensions: NEEDLE_HAYSTACK_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

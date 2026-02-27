@@ -50,7 +50,6 @@ Submit a JSON object with:
 export const performanceOptimizerModule: ChallengeModule = {
   slug: "performance-optimizer",
   dimensions: PERFORMANCE_OPTIMIZER_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

@@ -9,7 +9,7 @@ export const sandboxRoutes = new Hono();
 /**
  * Generic sandbox dispatcher — DEPRECATED.
  *
- * All challenges have been migrated to the workspace execution model.
+ * All challenges provide workspace tarballs — sandbox APIs are retired.
  * This route is kept for backward compatibility with any external agents
  * that may still attempt sandbox API calls. All modules now return empty
  * Hono apps, so requests will receive 404 responses.

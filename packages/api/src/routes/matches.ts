@@ -42,8 +42,6 @@ matchRoutes.post(
       return errorEnvelope(c, "Challenge module not implemented", 501, "This trial's arena is still under construction.");
     }
 
-    const isWorkspace = mod.execution === "workspace";
-
     // Check for existing active match
     const existingActive = await db.query.matches.findFirst({
       where: and(
@@ -59,29 +57,6 @@ matchRoutes.post(
           .set({ status: "expired" })
           .where(eq(matches.id, existingActive.id));
       } else {
-        // Return existing match info
-        if (isWorkspace) {
-          return envelope(c, {
-            match_id: existingActive.id,
-            bout_name: existingActive.boutName,
-            status: "active",
-            objective: existingActive.objective,
-            time_limit_secs: challenge.timeLimitSecs,
-            expires_at: existingActive.expiresAt,
-            match_type: challenge.matchType,
-            execution: "workspace",
-            workspace_url: `/api/v1/challenges/${challenge.slug}/workspace?seed=${existingActive.seed}`,
-            challenge_md: mod.workspaceSpec?.challengeMd ?? null,
-            submission_spec: mod.submissionSpec ?? null,
-            submit_url: `/api/v1/matches/${existingActive.id}/submit`,
-            note: "You already have an active match. Complete or wait for it to expire.",
-          }, 200, "Your current bout awaits, gladiator. Do not keep the crowd waiting.");
-        }
-
-        const sandboxUrls: Record<string, string> = {};
-        for (const api of mod.sandboxApiNames()) {
-          sandboxUrls[api] = `/api/v1/sandbox/${existingActive.id}/${api}`;
-        }
         return envelope(c, {
           match_id: existingActive.id,
           bout_name: existingActive.boutName,
@@ -90,8 +65,9 @@ matchRoutes.post(
           time_limit_secs: challenge.timeLimitSecs,
           expires_at: existingActive.expiresAt,
           match_type: challenge.matchType,
-          execution: "sandbox",
-          sandbox_urls: sandboxUrls,
+          workspace_url: `/api/v1/challenges/${challenge.slug}/workspace?seed=${existingActive.seed}`,
+          challenge_md: mod.workspaceSpec?.challengeMd ?? null,
+          submission_spec: mod.submissionSpec ?? null,
           submit_url: `/api/v1/matches/${existingActive.id}/submit`,
           note: "You already have an active match. Complete or wait for it to expire.",
         }, 200, "Your current bout awaits, gladiator. Do not keep the crowd waiting.");
@@ -127,40 +103,6 @@ matchRoutes.post(
       extraUrls.heartbeat_url = `/api/v1/matches/${match.id}/heartbeat`;
     }
 
-    if (isWorkspace) {
-      return envelope(
-        c,
-        {
-          match_id: match.id,
-          bout_name: boutName,
-          challenge: {
-            slug: challenge.slug,
-            name: challenge.name,
-            category: challenge.category,
-            match_type: challenge.matchType,
-          },
-          execution: "workspace",
-          objective: data.objective,
-          time_limit_secs: challenge.timeLimitSecs,
-          started_at: match.startedAt,
-          expires_at: match.expiresAt,
-          workspace_url: `/api/v1/challenges/${challenge.slug}/workspace?seed=${seed}`,
-          challenge_md: mod.workspaceSpec?.challengeMd ?? null,
-          submission_spec: mod.submissionSpec ?? null,
-          submit_url: `/api/v1/matches/${match.id}/submit`,
-          ...extraUrls,
-        },
-        201,
-        `${boutName} begins! Download your workspace and get to work. You have ${challenge.timeLimitSecs} seconds.`,
-      );
-    }
-
-    // Sandbox-based challenge (legacy)
-    const sandboxUrls: Record<string, string> = {};
-    for (const api of mod.sandboxApiNames()) {
-      sandboxUrls[api] = `/api/v1/sandbox/${match.id}/${api}`;
-    }
-
     return envelope(
       c,
       {
@@ -172,17 +114,18 @@ matchRoutes.post(
           category: challenge.category,
           match_type: challenge.matchType,
         },
-        execution: "sandbox",
         objective: data.objective,
         time_limit_secs: challenge.timeLimitSecs,
         started_at: match.startedAt,
         expires_at: match.expiresAt,
-        sandbox_urls: sandboxUrls,
+        workspace_url: `/api/v1/challenges/${challenge.slug}/workspace?seed=${seed}`,
+        challenge_md: mod.workspaceSpec?.challengeMd ?? null,
+        submission_spec: mod.submissionSpec ?? null,
         submit_url: `/api/v1/matches/${match.id}/submit`,
         ...extraUrls,
       },
       201,
-      `${boutName} begins! The crowd roars. You have ${challenge.timeLimitSecs} seconds.`,
+      `${boutName} begins! Download your workspace and get to work. You have ${challenge.timeLimitSecs} seconds.`,
     );
   },
 );
@@ -545,17 +488,12 @@ matchRoutes.get("/:matchId", async (c) => {
     where: eq(challenges.id, match.challengeId),
   });
 
-  // Look up module for execution model
-  const mod = challenge ? (await import("../challenges/registry.js")).getChallenge(challenge.slug) : null;
-  const execution = mod?.execution ?? "sandbox";
-
   return envelope(c, {
     id: match.id,
     bout_name: match.boutName,
     challenge_id: match.challengeId,
     challenge_slug: challenge?.slug ?? null,
     match_type: challenge?.matchType ?? "single",
-    execution,
     agent: agent
       ? { id: agent.id, name: agent.name, title: agent.title }
       : null,

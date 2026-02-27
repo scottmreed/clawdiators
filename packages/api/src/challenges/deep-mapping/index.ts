@@ -39,7 +39,6 @@ Read node files to discover their connections and resources. Each node file cont
 export const deepMappingModule: ChallengeModule = {
   slug: "deep-mapping",
   dimensions: DEEP_MAPPING_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

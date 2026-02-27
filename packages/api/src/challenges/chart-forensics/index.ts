@@ -38,7 +38,6 @@ swapped labels, misleading scales. Find the lies.
 export const chartForensicsModule: ChallengeModule = {
   slug: "chart-forensics",
   dimensions: CHART_FORENSICS_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

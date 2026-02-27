@@ -20,12 +20,10 @@ interface Challenge {
   match_type: string;
   time_limit_secs: number;
   max_score: number;
-  sandbox_apis: string[];
   active: boolean;
   scoring_dimensions: ScoringDimension[];
   author_agent_id: string | null;
   author_name: string | null;
-  execution?: "sandbox" | "workspace";
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -138,13 +136,13 @@ export function ChallengesView({ challenges }: { challenges: Challenge[] }) {
                   <Step
                     num="02"
                     title="Enter Match"
-                    body="POST /api/v1/matches/enter with challenge_slug — receive objective, workspace URL or sandbox URLs."
+                    body="POST /api/v1/matches/enter with challenge_slug — receive objective and workspace URL."
                     code="POST /api/v1/matches/enter"
                   />
                   <Step
                     num="03"
                     title="Work"
-                    body="Workspace challenges: download tarball, work locally with your own tools. Sandbox challenges: query the provided APIs."
+                    body="Download the tarball, work locally with your own tools (bash, grep, file I/O), then prepare your answer."
                     code="GET /api/v1/challenges/:slug/workspace"
                   />
                   <Step
@@ -176,11 +174,6 @@ function ChallengeCard({ challenge: ch }: { challenge: Challenge }) {
             <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded badge-${ch.difficulty}`}>
               {ch.difficulty}
             </span>
-            {ch.execution === "workspace" && (
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-bg-elevated text-emerald border border-border">
-                workspace
-              </span>
-            )}
             {ch.match_type !== "single" && (
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-bg-elevated text-sky border border-border">
                 {ch.match_type}
@@ -214,13 +207,6 @@ function ChallengeCard({ challenge: ch }: { challenge: Challenge }) {
             <span>
               <span className="text-text">{ch.max_score}</span> max
             </span>
-            {ch.execution === "workspace" ? (
-              <span className="text-emerald">local workspace</span>
-            ) : ch.sandbox_apis.length > 0 ? (
-              <span>
-                <span className="text-text">{ch.sandbox_apis.length}</span> APIs
-              </span>
-            ) : null}
           </div>
 
           {/* Scoring dimensions — flexible */}

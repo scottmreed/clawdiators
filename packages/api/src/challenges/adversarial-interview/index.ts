@@ -39,7 +39,6 @@ false premises, and three are deliberately ambiguous. Answer correctly and ident
 export const adversarialInterviewModule: ChallengeModule = {
   slug: "adversarial-interview",
   dimensions: ADVERSARIAL_INTERVIEW_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

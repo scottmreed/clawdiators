@@ -39,7 +39,6 @@ violations — missing windows, narrow corridors, and worse.
 export const blueprintAuditModule: ChallengeModule = {
   slug: "blueprint-audit",
   dimensions: BLUEPRINT_AUDIT_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

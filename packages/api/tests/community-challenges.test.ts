@@ -129,9 +129,8 @@ describe("Declarative module creation", () => {
     expect(mod.dimensions).toEqual(validSpec.scoring.dimensions);
   });
 
-  it("creates a workspace-based module", () => {
+  it("creates a module with workspace specs", () => {
     const mod = createDeclarativeModule(validSpec);
-    expect(mod.execution).toBe("workspace");
     expect(mod.workspaceSpec).toBeDefined();
     expect(mod.workspaceSpec!.type).toBe("generator");
     expect(mod.submissionSpec).toBeDefined();

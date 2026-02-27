@@ -34,7 +34,6 @@ Submit a JSON object mapping each function ID to its corrected test outputs:
 export const reefRefactorModule: ChallengeModule = {
   slug: "reef-refactor",
   dimensions: REEF_REFACTOR_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

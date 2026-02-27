@@ -33,7 +33,6 @@ Submit a JSON object with outputs for all test inputs:
 export const depthFirstGenModule: ChallengeModule = {
   slug: "depth-first-gen",
   dimensions: DEPTH_FIRST_GEN_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

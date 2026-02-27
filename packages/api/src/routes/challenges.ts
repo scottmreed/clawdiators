@@ -5,6 +5,7 @@ import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { getChallenge } from "../challenges/registry.js";
 import { buildWorkspaceArchive } from "../challenges/workspace.js";
 
+
 export const challengeRoutes = new Hono();
 
 // Helper to resolve author agent name
@@ -16,9 +17,12 @@ async function resolveAuthorName(authorAgentId: string | null): Promise<string |
   return agent?.name ?? null;
 }
 
-// GET /challenges — returns all challenges (active + coming soon)
+// GET /challenges — returns active challenges (pass ?all=true for inactive too)
 challengeRoutes.get("/", async (c) => {
-  const allChallenges = await db.query.challenges.findMany();
+  const showAll = c.req.query("all") === "true";
+  const allChallenges = await db.query.challenges.findMany({
+    where: showAll ? undefined : eq(challenges.active, true),
+  });
 
   // Batch-resolve author names
   const authorIds = [...new Set(allChallenges.map((ch) => ch.authorAgentId).filter(Boolean))] as string[];
@@ -30,27 +34,21 @@ challengeRoutes.get("/", async (c) => {
 
   return envelope(
     c,
-    allChallenges.map((ch) => {
-      const mod = getChallenge(ch.slug);
-      const execution = mod?.execution ?? "sandbox";
-      return {
-        slug: ch.slug,
-        name: ch.name,
-        description: ch.description,
-        lore: ch.lore,
-        category: ch.category,
-        difficulty: ch.difficulty,
-        match_type: ch.matchType,
-        time_limit_secs: ch.timeLimitSecs,
-        max_score: ch.maxScore,
-        sandbox_apis: ch.sandboxApis,
-        active: ch.active,
-        scoring_dimensions: ch.scoringDimensions,
-        author_agent_id: ch.authorAgentId,
-        author_name: ch.authorAgentId ? (authorMap[ch.authorAgentId] ?? null) : null,
-        execution,
-      };
-    }),
+    allChallenges.map((ch) => ({
+      slug: ch.slug,
+      name: ch.name,
+      description: ch.description,
+      lore: ch.lore,
+      category: ch.category,
+      difficulty: ch.difficulty,
+      match_type: ch.matchType,
+      time_limit_secs: ch.timeLimitSecs,
+      max_score: ch.maxScore,
+      active: ch.active,
+      scoring_dimensions: ch.scoringDimensions,
+      author_agent_id: ch.authorAgentId,
+      author_name: ch.authorAgentId ? (authorMap[ch.authorAgentId] ?? null) : null,
+    })),
   );
 });
 
@@ -72,9 +70,8 @@ challengeRoutes.get("/:slug", async (c) => {
 
   const authorName = await resolveAuthorName(challenge.authorAgentId);
 
-  // Look up module for execution model info
+  // Look up module for workspace specs
   const mod = getChallenge(challenge.slug);
-  const execution = mod?.execution ?? "sandbox";
 
   return envelope(c, {
     slug: challenge.slug,
@@ -87,20 +84,14 @@ challengeRoutes.get("/:slug", async (c) => {
     time_limit_secs: challenge.timeLimitSecs,
     max_score: challenge.maxScore,
     scoring_dimensions: challenge.scoringDimensions,
-    sandbox_apis: challenge.sandboxApis,
     active: challenge.active,
     config: challenge.config,
     phases: challenge.phases,
     author_agent_id: challenge.authorAgentId,
     author_name: authorName,
-    // New workspace-based fields
-    execution,
-    workspace_spec: mod?.workspaceSpec ?? null,
     submission_spec: mod?.submissionSpec ?? null,
     scoring_spec: mod?.scoringSpec ?? null,
-    workspace_url: execution === "workspace"
-      ? `/api/v1/challenges/${challenge.slug}/workspace`
-      : null,
+    workspace_url: `/api/v1/challenges/${challenge.slug}/workspace`,
   });
 });
 
@@ -117,9 +108,9 @@ challengeRoutes.get("/:slug/workspace", async (c) => {
   }
 
   const mod = getChallenge(slug);
-  if (!mod || mod.execution !== "workspace") {
-    return errorEnvelope(c, "This challenge does not use workspaces", 400,
-      "This trial uses sandbox APIs, not workspace files.");
+  if (!mod) {
+    return errorEnvelope(c, "Challenge module not implemented", 501,
+      "This trial's arena is still under construction.");
   }
 
   if (!mod.generateWorkspace) {

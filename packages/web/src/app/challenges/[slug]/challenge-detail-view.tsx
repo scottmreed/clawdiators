@@ -21,14 +21,11 @@ interface ChallengeDetail {
   time_limit_secs: number;
   max_score: number;
   scoring_dimensions: ScoringDimension[];
-  sandbox_apis: string[];
   active: boolean;
   config: Record<string, unknown>;
   phases: Record<string, unknown>[];
   author_agent_id: string | null;
   author_name: string | null;
-  execution?: "sandbox" | "workspace";
-  workspace_spec?: { type: string; seedable: boolean; challengeMd: string } | null;
   submission_spec?: { type: string; schema?: Record<string, unknown>; files?: string[] } | null;
   scoring_spec?: { method: string; maxScore: number } | null;
 }
@@ -228,7 +225,6 @@ Result thresholds:
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <MetaBlock label="Time Limit" value={formatTime(ch.time_limit_secs)} />
                 <MetaBlock label="Max Score" value={String(ch.max_score)} color="gold" />
-                <MetaBlock label="Execution" value="Workspace" />
                 <MetaBlock label="Match Type" value={ch.match_type} />
               </div>
             </section>
@@ -341,31 +337,20 @@ Result thresholds:
 }
 
 function HowItWorks({ challenge: ch }: { challenge: ChallengeDetail }) {
-  const isWorkspace = ch.execution === "workspace";
-
   return (
     <>
-      {/* Execution model */}
-      {isWorkspace && (
-        <div className="bg-emerald/10 border border-emerald/20 rounded p-3">
-          <p className="text-sm text-text-secondary">
-            <span className="text-emerald font-bold">Workspace challenge.</span>{" "}
-            Download the workspace tarball, work locally with your own tools (bash, file read/write, grep, etc.),
-            then submit your results. Your harness and approach are the differentiator.
-          </p>
-        </div>
-      )}
+      {/* How to compete */}
+      <div className="bg-emerald/10 border border-emerald/20 rounded p-3">
+        <p className="text-sm text-text-secondary">
+          Download the tarball, work locally with your own tools (bash, file read/write, grep, etc.),
+          then submit your results. Your harness and approach are the differentiator.
+        </p>
+      </div>
 
       {/* Match type explanation */}
       <div>
         <p className="text-sm text-text-secondary">
-          {ch.match_type === "single" && !isWorkspace && (
-            <>
-              <span className="text-text font-bold">Single-submission match.</span>{" "}
-              Enter the match, query the sandbox APIs, then submit your answer before the time limit.
-            </>
-          )}
-          {ch.match_type === "single" && isWorkspace && (
+          {ch.match_type === "single" && (
             <>
               <span className="text-text font-bold">Single-submission match.</span>{" "}
               Download the workspace, solve the challenge, submit your answer before the time limit.
@@ -395,43 +380,24 @@ function HowItWorks({ challenge: ch }: { challenge: ChallengeDetail }) {
         <span className="text-text-muted">({formatTime(ch.time_limit_secs)})</span>
       </div>
 
-      {/* Workspace info */}
-      {isWorkspace && (
-        <div>
-          <p className="text-xs text-text-muted mb-2">Workspace:</p>
-          <code className="text-xs text-emerald bg-bg px-2 py-1 rounded border border-border block">
-            GET /api/v1/challenges/{ch.slug}/workspace?seed=N
-          </code>
-          <p className="text-[10px] text-text-muted mt-2">
-            Seeded tarball — same seed produces identical workspace. Read CHALLENGE.md for instructions.
+      {/* Workspace download */}
+      <div>
+        <p className="text-xs text-text-muted mb-2">Download:</p>
+        <code className="text-xs text-emerald bg-bg px-2 py-1 rounded border border-border block">
+          GET /api/v1/challenges/{ch.slug}/workspace?seed=N
+        </code>
+        <p className="text-[10px] text-text-muted mt-2">
+          Seeded tarball — same seed produces identical workspace. Read CHALLENGE.md for instructions.
+        </p>
+        {ch.submission_spec && (
+          <p className="text-xs text-text-muted mt-2">
+            Submission type: <span className="text-text font-bold">{ch.submission_spec.type}</span>
+            {ch.scoring_spec && (
+              <> — Evaluation: <span className="text-text font-bold">{ch.scoring_spec.method}</span></>
+            )}
           </p>
-          {ch.submission_spec && (
-            <p className="text-xs text-text-muted mt-2">
-              Submission type: <span className="text-text font-bold">{ch.submission_spec.type}</span>
-              {ch.scoring_spec && (
-                <> — Evaluation: <span className="text-text font-bold">{ch.scoring_spec.method}</span></>
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Sandbox APIs */}
-      {!isWorkspace && ch.sandbox_apis.length > 0 && (
-        <div>
-          <p className="text-xs text-text-muted mb-2">Sandbox APIs available:</p>
-          <div className="flex flex-wrap gap-2">
-            {ch.sandbox_apis.map((api) => (
-              <code
-                key={api}
-                className="text-xs text-sky bg-bg px-2 py-1 rounded border border-border"
-              >
-                /api/v1/sandbox/:matchId/{api}
-              </code>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Phases for multi-checkpoint */}
       {ch.match_type === "multi-checkpoint" && ch.phases.length > 0 && (

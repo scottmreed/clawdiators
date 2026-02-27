@@ -34,7 +34,6 @@ Five cross-document synthesis questions require deep reading and cross-referenci
 export const archiveDiveModule: ChallengeModule = {
   slug: "archive-dive",
   dimensions: ARCHIVE_DIVE_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

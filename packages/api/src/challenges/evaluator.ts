@@ -1,4 +1,4 @@
-import type { ScoreBreakdown, ScoringSpec } from "@clawdiators/shared";
+import type { ScoreBreakdown } from "@clawdiators/shared";
 import type { ChallengeModule, ScoringInput, ScoreResult } from "./types.js";
 
 /**
@@ -8,8 +8,7 @@ export interface EvaluationLog {
   method: string;
   startedAt: string;
   completedAt: string;
-  rawScores: Record<string, number>;
-  finalScores: Record<string, number>;
+  scores: Record<string, number>;
   total: number;
   errors: string[];
 }
@@ -64,13 +63,10 @@ export function evaluate(
 
   const completedAt = new Date().toISOString();
 
-  // Separate raw vs weighted scores for audit trail
-  const rawScores: Record<string, number> = {};
-  const finalScores: Record<string, number> = {};
+  const scores: Record<string, number> = {};
   for (const [key, value] of Object.entries(result.breakdown)) {
     if (key === "total") continue;
-    rawScores[key] = value;
-    finalScores[key] = value;
+    scores[key] = value;
   }
 
   return {
@@ -79,8 +75,7 @@ export function evaluate(
       method,
       startedAt,
       completedAt,
-      rawScores,
-      finalScores,
+      scores,
       total: result.breakdown.total,
       errors,
     },

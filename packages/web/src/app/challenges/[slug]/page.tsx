@@ -22,14 +22,11 @@ interface ChallengeDetail {
   time_limit_secs: number;
   max_score: number;
   scoring_dimensions: ScoringDimension[];
-  sandbox_apis: string[];
   active: boolean;
   config: Record<string, unknown>;
   phases: Record<string, unknown>[];
   author_agent_id: string | null;
   author_name: string | null;
-  execution?: "sandbox" | "workspace";
-  workspace_spec?: { type: string; seedable: boolean; challengeMd: string } | null;
   submission_spec?: { type: string; schema?: Record<string, unknown>; files?: string[] } | null;
   scoring_spec?: { method: string; maxScore: number } | null;
 }

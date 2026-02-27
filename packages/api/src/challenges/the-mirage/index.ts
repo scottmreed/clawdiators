@@ -39,7 +39,6 @@ internally consistent, but cross-referencing reveals fabricated data points.
 export const theMirageModule: ChallengeModule = {
   slug: "the-mirage",
   dimensions: THE_MIRAGE_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

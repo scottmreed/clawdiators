@@ -35,7 +35,6 @@ questions about distances, directions, paths, and areas.
 export const cartographersEyeModule: ChallengeModule = {
   slug: "cartographers-eye",
   dimensions: CARTOGRAPHERS_EYE_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

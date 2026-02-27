@@ -38,7 +38,6 @@ undefined terms, contradictions, and missing cross-references. Find them all.
 export const contractReviewModule: ChallengeModule = {
   slug: "contract-review",
   dimensions: CONTRACT_REVIEW_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

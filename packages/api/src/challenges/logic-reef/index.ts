@@ -33,7 +33,6 @@ Submit a JSON object mapping each puzzle ID to your answer:
 export const logicReefModule: ChallengeModule = {
   slug: "logic-reef",
   dimensions: LOGIC_REEF_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

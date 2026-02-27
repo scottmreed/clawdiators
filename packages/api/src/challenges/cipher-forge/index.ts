@@ -42,7 +42,6 @@ Submit a JSON object mapping each cipher ID to its decrypted plaintext:
 export const cipherForgeModule: ChallengeModule = {
   slug: "cipher-forge",
   dimensions: CIPHER_FORGE_DIMENSIONS,
-  execution: "workspace",
 
   workspaceSpec: {
     type: "generator",

@@ -23,6 +23,12 @@ import { generateInterviewData } from "../src/challenges/adversarial-interview/d
 import { scoreInterview } from "../src/challenges/adversarial-interview/scorer.js";
 import { generateMirageData } from "../src/challenges/the-mirage/data.js";
 import { scoreMirage } from "../src/challenges/the-mirage/scorer.js";
+import { generateArchaeologyData } from "../src/challenges/codebase-archaeology/data.js";
+import { scoreArchaeology } from "../src/challenges/codebase-archaeology/scorer.js";
+import { generateHaystackData } from "../src/challenges/needle-haystack/data.js";
+import { scoreHaystack } from "../src/challenges/needle-haystack/scorer.js";
+import { generateOptimizerData } from "../src/challenges/performance-optimizer/data.js";
+import { scoreOptimizer } from "../src/challenges/performance-optimizer/scorer.js";
 
 // ── Deep Mapping ─────────────────────────────────────────────────────
 
@@ -791,5 +797,250 @@ describe("The Mirage scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+});
+
+// ── Codebase Archaeology ──────────────────────────────────────────
+
+describe("Codebase Archaeology data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateArchaeologyData(42);
+    const d2 = generateArchaeologyData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.files).toEqual(d2.files);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateArchaeologyData(42);
+    const d2 = generateArchaeologyData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+
+  it("generates workspace files including test and source", () => {
+    const d = generateArchaeologyData(42);
+    expect(Object.keys(d.files).length).toBeGreaterThan(5);
+    expect(d.files["GIT_LOG.txt"]).toBeDefined();
+    expect(d.files["COMMIT_HISTORY.md"]).toBeDefined();
+    expect(d.groundTruth.function_name.length).toBeGreaterThan(0);
+    expect(d.groundTruth.file_path.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Codebase Archaeology scoring", () => {
+  const data = generateArchaeologyData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("is deterministic", () => {
+    const sub = { buggy_commit: gt.buggy_commit_message, bug_description: gt.bug_description };
+    const r1 = scoreArchaeology({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    const r2 = scoreArchaeology({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    expect(r1).toEqual(r2);
+  });
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      buggy_commit: gt.buggy_commit_message,
+      bug_description: gt.bug_description,
+      fixed_code: gt.correct_function_body,
+      methodology: "Used git bisect to binary search through commits, identified failing test, diffed the buggy commit.",
+    };
+    const r = scoreArchaeology({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 120000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+    expect(r.breakdown.methodology).toBeGreaterThan(0);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      buggy_commit: gt.buggy_commit_message,
+      bug_description: gt.bug_description,
+      fixed_code: gt.correct_function_body,
+      methodology: "Used git bisect to binary search, reviewed diff, ran tests to confirm fix.",
+    };
+    const r = scoreArchaeology({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+
+  it("empty submission gets low score", () => {
+    const r = scoreArchaeology({
+      submission: {}, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
+    });
+    expect(r.breakdown.identification).toBe(0);
+    expect(r.breakdown.fix_quality).toBe(0);
+  });
+});
+
+// ── Needle in a Haystack ──────────────────────────────────────────
+
+describe("Needle Haystack data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateHaystackData(42);
+    const d2 = generateHaystackData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.files).toEqual(d2.files);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateHaystackData(42);
+    const d2 = generateHaystackData(99);
+    expect(d1.groundTruth).not.toEqual(d2.groundTruth);
+  });
+
+  it("generates questions with source files", () => {
+    const d = generateHaystackData(42);
+    expect(d.groundTruth.answers.length).toBeGreaterThanOrEqual(5);
+    for (const ans of d.groundTruth.answers) {
+      expect(ans.answer.length).toBeGreaterThan(0);
+      expect(ans.source_files.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("Needle Haystack scoring", () => {
+  const data = generateHaystackData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("is deterministic", () => {
+    const sub = { answers: [{ question_id: gt.answers[0].question_id, answer: gt.answers[0].answer }] };
+    const r1 = scoreHaystack({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    const r2 = scoreHaystack({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    expect(r1).toEqual(r2);
+  });
+
+  it("perfect answer gets high score", () => {
+    const sub = {
+      answers: gt.answers.map((a) => ({
+        question_id: a.question_id,
+        answer: a.answer,
+        sources: a.source_files,
+      })),
+    };
+    const r = scoreHaystack({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 120000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
+    expect(r.breakdown.citations).toBeGreaterThan(0);
+    expect(r.breakdown.completeness).toBeGreaterThan(0);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      answers: gt.answers.map((a) => ({
+        question_id: a.question_id,
+        answer: a.answer,
+        sources: a.source_files,
+      })),
+    };
+    const r = scoreHaystack({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+
+  it("empty submission gets zero accuracy and completeness", () => {
+    const r = scoreHaystack({
+      submission: { answers: [] }, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
+    });
+    expect(r.breakdown.accuracy).toBe(0);
+    expect(r.breakdown.completeness).toBe(0);
+  });
+});
+
+// ── Performance Optimizer ─────────────────────────────────────────
+
+describe("Performance Optimizer data generation", () => {
+  it("is deterministic — same seed produces same data", () => {
+    const d1 = generateOptimizerData(42);
+    const d2 = generateOptimizerData(42);
+    expect(d1.groundTruth).toEqual(d2.groundTruth);
+    expect(d1.files).toEqual(d2.files);
+  });
+
+  it("different seeds produce different data", () => {
+    const d1 = generateOptimizerData(42);
+    const d2 = generateOptimizerData(99);
+    // Different seeds may select different problem templates
+    const gt1 = JSON.stringify(d1.groundTruth);
+    const gt2 = JSON.stringify(d2.groundTruth);
+    expect(gt1).not.toBe(gt2);
+  });
+
+  it("generates workspace files including source, test, and benchmark", () => {
+    const d = generateOptimizerData(42);
+    expect(Object.keys(d.files).length).toBeGreaterThan(3);
+    expect(d.groundTruth.function_name.length).toBeGreaterThan(0);
+    expect(d.groundTruth.file_path.length).toBeGreaterThan(0);
+    expect(d.groundTruth.optimizations.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Performance Optimizer scoring", () => {
+  const data = generateOptimizerData(42);
+  const gt = data.groundTruth;
+  const startedAt = new Date("2026-02-01T10:00:00Z");
+
+  it("is deterministic", () => {
+    const sub = { optimized_code: `export function ${gt.function_name}() { return []; }` };
+    const r1 = scoreOptimizer({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    const r2 = scoreOptimizer({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0 });
+    expect(r1).toEqual(r2);
+  });
+
+  it("optimized answer gets high score", () => {
+    const sub = {
+      optimized_code: `export function ${gt.function_name}(arr: number[]): number[] {
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const x of arr) {
+    if (seen.has(x)) result.push(x);
+    seen.add(x);
+  }
+  return result;
+}`,
+      explanation: "Replaced nested loop with a Set for O(n) linear time complexity. The bottleneck was quadratic .includes() on arrays.",
+    };
+    const r = scoreOptimizer({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 300000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeGreaterThanOrEqual(500);
+    expect(r.breakdown.methodology).toBeGreaterThan(0);
+  });
+
+  it("score never exceeds 1000", () => {
+    const sub = {
+      optimized_code: `export function ${gt.function_name}(arr: number[]): number[] {
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const x of arr) { if (seen.has(x)) result.push(x); seen.add(x); }
+  return result;
+}`,
+      explanation: "O(n) using hash set. Profiled and found bottleneck in nested loop, quadratic complexity.",
+    };
+    const r = scoreOptimizer({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeLessThanOrEqual(1000);
+  });
+
+  it("empty submission gets low score", () => {
+    const r = scoreOptimizer({
+      submission: {}, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
+    });
+    expect(r.breakdown.optimization).toBe(0);
+    expect(r.breakdown.correctness).toBe(0);
   });
 });
