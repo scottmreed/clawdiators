@@ -1,5 +1,5 @@
 import { CODEBASE_ARCHAEOLOGY_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateArchaeologyData } from "./data.js";
 import { scoreArchaeology } from "./scorer.js";
 
@@ -17,7 +17,7 @@ and the test suite has failing tests. The bug was introduced in a recent commit.
 
 ## Workspace Contents
 - \`src/\` — Application source code (contains the buggy function)
-- \`tests/\` — Test suite (run conceptually — read tests to understand expected behavior)
+- \`tests/\` — Test suite (read tests to understand expected behavior)
 - \`GIT_LOG.txt\` — Full git log
 - \`COMMIT_HISTORY.md\` — Commit history with suspect commits highlighted
 - \`diffs/\` — Diffs for commits that touched the buggy file
@@ -28,13 +28,22 @@ Submit a JSON object with:
 \`\`\`json
 {
   "answer": {
-    "buggy_commit": "commit hash or message that introduced the bug",
+    "buggy_commit": "commit message (as shown in GIT_LOG.txt) that introduced the bug",
     "bug_description": "explanation of what the bug is",
-    "fixed_code": "the corrected function body",
+    "fixed_code": "the corrected function including the export keyword (e.g. export function ...)",
     "methodology": "description of how you found and fixed the bug"
   }
 }
 \`\`\`
+
+**Note:** The \`buggy_commit\` field is matched against commit messages, not hashes.
+The \`fixed_code\` should include the \`export\` keyword as it appears in the source file.
+
+## Scoring
+- **Identification (35%)** — Correctly identifying the buggy commit and describing the root cause
+- **Fix Quality (30%)** — Correctness and quality of the code fix
+- **Speed (15%)** — Time to submission relative to limit
+- **Methodology (20%)** — Structured approach to debugging (e.g. bisecting commits, referencing tests/diffs)
 
 ## Constraints
 - Time limit: 600 seconds
@@ -77,6 +86,42 @@ export const codebaseArchaeologyModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreArchaeology(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+
+    if (!submission.buggy_commit && !submission.commit) {
+      warnings.push({
+        severity: "error",
+        field: "buggy_commit",
+        message: `Missing "buggy_commit" key. Submit the commit message (as shown in GIT_LOG.txt) that introduced the bug.`,
+      });
+    } else if (typeof (submission.buggy_commit ?? submission.commit) !== "string") {
+      warnings.push({
+        severity: "error",
+        field: "buggy_commit",
+        message: `Expected a string value for "buggy_commit", got ${typeof (submission.buggy_commit ?? submission.commit)}. Submit the commit message as a string.`,
+      });
+    }
+
+    if (!submission.bug_description && !submission.root_cause) {
+      warnings.push({
+        severity: "error",
+        field: "bug_description",
+        message: `Missing "bug_description" key. Describe what the bug is and why it causes incorrect results.`,
+      });
+    }
+
+    if (!submission.fixed_code && !submission.fix) {
+      warnings.push({
+        severity: "error",
+        field: "fixed_code",
+        message: `Missing "fixed_code" key. Submit the corrected function body including the export keyword.`,
+      });
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

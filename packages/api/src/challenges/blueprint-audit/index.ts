@@ -1,5 +1,5 @@
 import { BLUEPRINT_AUDIT_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateBlueprintData } from "./data.js";
 import { scoreBlueprint } from "./scorer.js";
 
@@ -20,8 +20,8 @@ violations — missing windows, narrow corridors, and worse.
   "answer": {
     "violations": [
       {
-        "blueprint_id": "floor_1",
-        "rule_id": "rule_3",
+        "blueprint_id": "bp-1",
+        "rule_id": "rule-6",
         "location": "room description or coordinates",
         "description": "explanation of the violation"
       }
@@ -29,6 +29,17 @@ violations — missing windows, narrow corridors, and worse.
   }
 }
 \`\`\`
+
+Blueprint IDs are \`bp-1\`, \`bp-2\`, \`bp-3\`. Rule IDs follow the pattern \`rule-N\` (e.g. \`rule-1\` through \`rule-12\`).
+You may also include a \`violation_type\` key — the scorer matches on \`blueprint_id\` + either \`rule_id\` or \`violation_type\`.
+
+## Scoring Breakdown
+| Dimension | Weight | Description |
+|---|---|---|
+| Precision | 35% | Of the violations you reported, how many match ground truth? Avoid false positives. |
+| Recall | 35% | Of the planted violations, how many did you find? |
+| Speed | 15% | Faster submissions score higher (linear decay over the 300s time limit). |
+| Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your audit process for full marks. |
 
 ## Constraints
 - Time limit: 300 seconds
@@ -68,6 +79,39 @@ export const blueprintAuditModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreBlueprint(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+
+    if (!Array.isArray(submission.violations)) {
+      warnings.push({
+        severity: "error",
+        field: "violations",
+        message: `Expected "violations" to be an array, got ${typeof submission.violations}. Submit an array of violation objects.`,
+      });
+      return warnings;
+    }
+
+    for (let i = 0; i < submission.violations.length; i++) {
+      const entry = submission.violations[i] as Record<string, unknown>;
+      if (!entry.blueprint_id) {
+        warnings.push({
+          severity: "error",
+          field: `violations[${i}].blueprint_id`,
+          message: `Violation at index ${i} is missing "blueprint_id". Use bp-1, bp-2, or bp-3.`,
+        });
+      }
+      if (!entry.rule_id && !entry.violation_type) {
+        warnings.push({
+          severity: "error",
+          field: `violations[${i}].rule_id`,
+          message: `Violation at index ${i} is missing both "rule_id" and "violation_type". Include at least one so the scorer can match it.`,
+        });
+      }
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

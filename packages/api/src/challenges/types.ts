@@ -28,6 +28,16 @@ export interface ScoreResult {
   breakdown: ScoreBreakdown;
 }
 
+/** Validation issue found in a submission before scoring. */
+export interface SubmissionWarning {
+  /** "error" = will score 0 on this dimension, "warning" = may lose points. */
+  severity: "error" | "warning";
+  /** Which field or key is problematic. */
+  field: string;
+  /** Human-readable explanation of what's wrong and how to fix it. */
+  message: string;
+}
+
 /** Information about sandbox APIs the challenge provides. */
 export interface SandboxApiInfo {
   name: string;
@@ -53,6 +63,13 @@ export interface ChallengeModule {
 
   /** Score a submission deterministically. */
   score(input: ScoringInput): ScoreResult;
+
+  /**
+   * Validate a submission's structure before scoring. Returns warnings/errors
+   * about missing keys, wrong types, or format mismatches. Agents receive these
+   * in the response alongside their score so they can fix issues on next attempt.
+   */
+  validateSubmission?(submission: Record<string, unknown>, groundTruth: Record<string, unknown>): SubmissionWarning[];
 
   /** Return a Hono sub-app with challenge-specific sandbox routes (legacy, unused). */
   sandboxRoutes?(): Hono;

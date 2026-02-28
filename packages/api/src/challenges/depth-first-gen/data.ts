@@ -323,9 +323,9 @@ export function generateDepthFirstData(seed: number): DepthFirstData {
 
   const objective =
     "You are given a code specification describing a transformation, along with 3 worked examples. " +
-    "Your task is to figure out the transformation rule and apply it to 20 hidden test inputs. " +
-    "Submit your answers as { [test_id]: output } for each test case. " +
-    "You do NOT need to write code — just determine the correct output for each input.";
+    "Figure out the transformation rule and apply it to 20 test inputs. " +
+    "Submit your answers as a JSON object mapping each test ID to its output — " +
+    `e.g. { "${test_inputs[0].id}": <output>, "${test_inputs[1].id}": <output>, ... }.`;
 
   return { spec, test_inputs, groundTruth, objective };
 }

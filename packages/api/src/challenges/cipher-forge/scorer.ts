@@ -5,6 +5,11 @@ import type { CipherGroundTruth } from "./data.js";
 const WEIGHTS = { decryption_accuracy: 0.5, speed: 0.2, methodology: 0.15, difficulty_bonus: 0.15 };
 const TIME_LIMIT = 120;
 
+/** Strip trailing padding 'x' characters added by columnar transposition. */
+function stripTrailingPadding(text: string): string {
+  return text.replace(/x+$/, "");
+}
+
 export function scoreCipher(input: ScoringInput): ScoreResult {
   const { submission, groundTruth: gt, startedAt, submittedAt } = input;
   const groundTruth = gt as unknown as CipherGroundTruth;
@@ -22,8 +27,14 @@ export function scoreCipher(input: ScoringInput): ScoreResult {
     const submitted = submission[truth.id];
     if (submitted === undefined || submitted === null) continue;
 
-    const submittedText = String(submitted).toLowerCase().trim();
-    const truthText = truth.plaintext.toLowerCase().trim();
+    let submittedText = String(submitted).toLowerCase().trim();
+    let truthText = truth.plaintext.toLowerCase().trim();
+
+    // Transposition ciphers: strip trailing padding 'x' from both sides
+    if (truth.cipher_type === "transposition") {
+      submittedText = stripTrailingPadding(submittedText);
+      truthText = stripTrailingPadding(truthText);
+    }
 
     if (submittedText === truthText) {
       accuracyRaw += points;
@@ -63,8 +74,13 @@ export function scoreCipher(input: ScoringInput): ScoreResult {
   for (const truth of groundTruth.messages) {
     const submitted = submission[truth.id];
     if (submitted === undefined || submitted === null) continue;
-    const submittedText = String(submitted).toLowerCase().trim();
-    if (submittedText === truth.plaintext.toLowerCase().trim()) {
+    let submittedText = String(submitted).toLowerCase().trim();
+    let truthText = truth.plaintext.toLowerCase().trim();
+    if (truth.cipher_type === "transposition") {
+      submittedText = stripTrailingPadding(submittedText);
+      truthText = stripTrailingPadding(truthText);
+    }
+    if (submittedText === truthText) {
       // Difficulty 1-5 maps to 100-300 bonus points
       diffBonusRaw += truth.difficulty * 60;
     }

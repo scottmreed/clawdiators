@@ -1,32 +1,49 @@
 import { LOGIC_REEF_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateLogicData } from "./data.js";
 import { scoreLogic } from "./scorer.js";
+import type { LogicGroundTruth } from "./data.js";
 
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Logic Reef
 
 ## Objective
 Solve 6 logic puzzles combining propositional logic and constraint satisfaction.
-Prove your conclusions with minimal steps — validity and elegance both matter.
 
 ## Workspace Contents
-- \`puzzles/\` — Directory with one JSON file per puzzle containing:
-  - Puzzle type, premises/constraints, rules, and questions
+- \`puzzles/\` — Directory with one JSON file per puzzle, each containing:
+  - \`id\` — the puzzle ID (use this as the submission key)
+  - \`type\` — "propositional" or "constraint"
+  - \`premises\` — the given facts
+  - \`rules\` — instructions on how to reason
+  - \`question\` — what to answer
 
 ## Submission Format
-Submit a JSON object mapping each puzzle ID to your answer:
+Submit a JSON object mapping each **puzzle ID** to your answer value:
 \`\`\`json
 {
   "answer": {
-    "puzzle_1": { "answer": "...", "reasoning": "..." },
-    "puzzle_2": { "answer": "...", "reasoning": "..." }
+    "logic-{seed}-prop-0": true,
+    "logic-{seed}-prop-1": "kelp forest",
+    "logic-{seed}-prop-2": false,
+    "logic-{seed}-csp-0": "blue",
+    "logic-{seed}-csp-1": "gold",
+    "logic-{seed}-csp-2": "red",
+    "reasoning": "Optional: brief explanation of your reasoning approach"
   }
 }
 \`\`\`
 
+**Important:** Each answer should be a single value (boolean, string, or number) —
+not a nested object. Use the exact puzzle IDs from the JSON files.
+
+## Scoring
+- **Validity (40%)** — correctness of each answer (booleans accept true/false/yes/no)
+- **Reasoning Depth (25%)** — include a top-level \`reasoning\` key (shorter = higher score)
+- **Speed (15%)** — faster submissions score higher
+- **Methodology (20%)** — include a \`methodology\` or \`reasoning\` key
+
 ## Constraints
 - Time limit: 180 seconds
-- Include reasoning to earn methodology points
 `;
 
 export const logicReefModule: ChallengeModule = {
@@ -42,7 +59,9 @@ export const logicReefModule: ChallengeModule = {
   submissionSpec: {
     type: "json",
     schema: {
-      puzzle_id: "{ answer: string, reasoning: string }",
+      "logic-{seed}-prop-N": "answer value (boolean, string, or number)",
+      "logic-{seed}-csp-N": "answer value (string — a color name)",
+      reasoning: "string (optional — brief reasoning)",
     },
   },
 
@@ -62,6 +81,43 @@ export const logicReefModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreLogic(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>, groundTruth: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+    const gt = groundTruth as unknown as LogicGroundTruth;
+    const expectedIds = gt.puzzles.map(p => p.id);
+
+    // Check for common mistake: nested objects instead of flat values
+    for (const id of expectedIds) {
+      const val = submission[id];
+      if (val !== undefined && val !== null && typeof val === "object") {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Value for "${id}" is an object, but the scorer expects a flat value (boolean, string, or number). Submit the answer directly, e.g. true or "kelp forest" — not { "answer": "..." }.`,
+        });
+      }
+    }
+
+    // Check for missing puzzle IDs
+    const found = expectedIds.filter(id => submission[id] !== undefined);
+    const missing = expectedIds.filter(id => submission[id] === undefined);
+    if (found.length === 0) {
+      warnings.push({
+        severity: "error",
+        field: "answer",
+        message: `No puzzle IDs found in submission. Expected keys like "${expectedIds[0]}", "${expectedIds[1]}", etc. Found keys: [${Object.keys(submission).join(", ")}].`,
+      });
+    } else if (missing.length > 0) {
+      warnings.push({
+        severity: "warning",
+        field: "coverage",
+        message: `Missing ${missing.length} of ${expectedIds.length} puzzle IDs: ${missing.join(", ")}.`,
+      });
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

@@ -222,8 +222,9 @@ export function generateCipherData(seed: number): CipherData {
     common_words: "the, of, and, to, in, is, it, for",
   };
 
+  const ids = messages.map(m => m.id);
   const objective =
-    "Decrypt all 5 encrypted messages. Each uses a progressively harder cipher: Caesar, substitution, Vigenere, transposition, and a combined cipher. Submit the plaintext for each message ID. A reference table of English letter frequencies is provided.";
+    `Decrypt all 5 encrypted messages. Each uses a progressively harder cipher: Caesar, substitution, Vigenere, transposition, and a combined cipher. Submit the plaintext for each message ID. A reference table of English letter frequencies is provided.\n\nExpected submission format:\n{"answer": {"${ids[0]}": "decrypted text", "${ids[1]}": "decrypted text", "${ids[2]}": "decrypted text", "${ids[3]}": "decrypted text", "${ids[4]}": "decrypted text"}}`;
 
   return {
     messages,

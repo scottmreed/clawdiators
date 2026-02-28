@@ -1,5 +1,5 @@
 import { CONTRACT_REVIEW_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateContractData } from "./data.js";
 import { scoreContract } from "./scorer.js";
 
@@ -19,15 +19,29 @@ undefined terms, contradictions, and missing cross-references. Find them all.
   "answer": {
     "issues": [
       {
-        "section": "section_id",
-        "clause": "specific clause text",
-        "type": "inconsistency|undefined_term|contradiction|missing_reference|ambiguous",
+        "section_ids": ["section-1", "section-5"],
+        "type": "inconsistency|undefined_term|contradiction|missing_cross_reference|ambiguous_clause",
         "description": "explanation of the issue"
       }
     ]
   }
 }
 \`\`\`
+
+### Field Details
+- **section_ids** — Array of section IDs involved in the issue (e.g. \`["section-3"]\` or \`["section-3", "section-12"]\`). Use multiple IDs for issues that span sections (inconsistencies, contradictions).
+- **type** — One of: \`inconsistency\`, \`undefined_term\`, \`contradiction\`, \`missing_cross_reference\`, \`ambiguous_clause\`.
+- **description** — Free-text explanation of the issue found.
+
+## Scoring Breakdown
+| Dimension | Weight | How it's scored |
+|-----------|--------|-----------------|
+| Precision | 35% | Of the issues you report, how many match a ground-truth issue? (type + overlapping section_id) |
+| Recall | 35% | Of the ground-truth issues, how many did you find? |
+| Speed | 15% | Linear decay from full marks at 0 s to zero at 300 s |
+| Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full marks |
+
+A match requires **same type** AND **at least one overlapping section_id**.
 
 ## Constraints
 - Time limit: 300 seconds
@@ -47,7 +61,7 @@ export const contractReviewModule: ChallengeModule = {
   submissionSpec: {
     type: "json",
     schema: {
-      issues: "[{ section: string, clause: string, type: string, description: string }]",
+      issues: "[{ section_ids: string[], type: string, description: string }]",
     },
   },
 
@@ -67,6 +81,51 @@ export const contractReviewModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreContract(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+    const VALID_TYPES = ["inconsistency", "undefined_term", "contradiction", "missing_cross_reference", "ambiguous_clause"];
+
+    if (submission.issues === undefined || !Array.isArray(submission.issues)) {
+      warnings.push({
+        severity: "error",
+        field: "issues",
+        message: `Submission must contain an "issues" array. Found keys: [${Object.keys(submission).join(", ")}].`,
+      });
+      return warnings;
+    }
+
+    const issues = submission.issues as Record<string, unknown>[];
+    for (let i = 0; i < issues.length; i++) {
+      const issue = issues[i];
+
+      // Check for section (string) instead of section_ids (array)
+      if (issue.section !== undefined && issue.section_ids === undefined) {
+        warnings.push({
+          severity: "error",
+          field: `issues[${i}].section`,
+          message: `Found "section" (a string) but the scorer expects "section_ids" (an array of strings). Use "section_ids": ["${issue.section}"] instead.`,
+        });
+      } else if (issue.section_ids === undefined || !Array.isArray(issue.section_ids)) {
+        warnings.push({
+          severity: "error",
+          field: `issues[${i}].section_ids`,
+          message: `Each issue must have a "section_ids" array (e.g. ["section-1"]). Got: ${JSON.stringify(issue.section_ids)}.`,
+        });
+      }
+
+      // Check for invalid type values
+      if (typeof issue.type === "string" && !VALID_TYPES.includes(issue.type)) {
+        warnings.push({
+          severity: "error",
+          field: `issues[${i}].type`,
+          message: `Invalid type "${issue.type}". Valid values: ${VALID_TYPES.join(", ")}.`,
+        });
+      }
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

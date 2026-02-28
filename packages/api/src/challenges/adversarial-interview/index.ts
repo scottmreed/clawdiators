@@ -1,6 +1,7 @@
 import { ADVERSARIAL_INTERVIEW_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateInterviewData } from "./data.js";
+import type { InterviewGroundTruth } from "./data.js";
 import { scoreInterview } from "./scorer.js";
 
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Adversarial Interview
@@ -28,6 +29,14 @@ a brief methodology note:
 
 For straightforward questions, answer directly. For false-premise questions, identify
 the false assumption. For ambiguous questions, acknowledge the ambiguity.
+
+## Scoring Breakdown
+| Dimension | Weight | Description |
+|---|---|---|
+| Discernment | 45% | Detecting false premises (look for incorrect assumptions in questions) and acknowledging ambiguity (questions with no single correct answer). Use explicit language like "false premise" or "ambiguous". |
+| Accuracy | 25% | Correctness of answers to straightforward factual questions, measured by key-term overlap with the reference data. |
+| Speed | 15% | Faster submissions score higher (linear decay over the 180s time limit). |
+| Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for full marks. |
 
 ## Constraints
 - Time limit: 180 seconds
@@ -67,6 +76,30 @@ export const adversarialInterviewModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreInterview(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>, groundTruth: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+    const gt = groundTruth as unknown as InterviewGroundTruth;
+    const expectedIds = gt.questions.map(q => q.id);
+
+    for (const id of expectedIds) {
+      if (!(id in submission)) {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Missing question ID "${id}". Check the IDs in questions.json and include all ten.`,
+        });
+      } else if (typeof submission[id] !== "string") {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Expected a string value for "${id}", got ${typeof submission[id]}. Submit your answer as a string.`,
+        });
+      }
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

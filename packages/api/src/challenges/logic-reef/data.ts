@@ -195,8 +195,12 @@ export function generateLogicData(seed: number): LogicData {
   results.push(generateConstraintPuzzle(seed, rng, 3, 1));
   results.push(generateConstraintPuzzle(seed, rng, 5, 2));
 
+  const puzzleIds = results.map(r => r.puzzle.id);
   const objective =
-    "Solve all 6 logic puzzles. Three are propositional logic (modus ponens, chain reasoning, contrapositive). Three are constraint satisfaction (assign properties to entities under constraints). Submit your answer for each puzzle ID. Minimal reasoning steps earn higher scores.";
+    "Solve all 6 logic puzzles. Three are propositional logic (modus ponens, chain reasoning, contrapositive). " +
+    "Three are constraint satisfaction (assign colors to creatures under constraints). " +
+    `Submit each answer as a flat value keyed by puzzle ID — e.g. { "${puzzleIds[0]}": true, "${puzzleIds[3]}": "blue" }. ` +
+    "Include a top-level 'reasoning' key for bonus points.";
 
   return {
     puzzles: results.map((r) => r.puzzle),

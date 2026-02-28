@@ -1,5 +1,5 @@
 import { NEEDLE_HAYSTACK_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateHaystackData } from "./data.js";
 import { scoreHaystack } from "./scorer.js";
 
@@ -39,11 +39,13 @@ Submit a JSON object with:
 }
 \`\`\`
 
-## Scoring
-- **Accuracy (45%)** — Correctness of answers against ground truth
-- **Citations (20%)** — Whether you identified the correct source documents
-- **Speed (15%)** — Time to submission
-- **Completeness (20%)** — Fraction of questions answered
+## Scoring Breakdown
+| Dimension | Weight | Description |
+|---|---|---|
+| Accuracy | 45% | Exact string matching against ground truth. Partial credit for answers containing key parts. Format numbers without commas (e.g. \`42500\` not \`42,500\`). |
+| Citations | 20% | Whether you identified the correct source documents. Extra citations are penalized — the denominator is max(truth sources, submitted sources). |
+| Speed | 15% | Faster submissions score higher (linear decay over the 900s time limit). |
+| Completeness | 20% | Fraction of the 5 questions answered with non-empty responses. |
 
 ## Constraints
 - Time limit: 900 seconds
@@ -87,6 +89,54 @@ export const needleHaystackModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreHaystack(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+
+    if (!Array.isArray(submission.answers)) {
+      warnings.push({
+        severity: "error",
+        field: "answers",
+        message: `Expected "answers" to be an array, got ${typeof submission.answers}. Submit an array of 5 answer objects.`,
+      });
+      return warnings;
+    }
+
+    if (submission.answers.length !== 5) {
+      warnings.push({
+        severity: "warning",
+        field: "answers",
+        message: `Expected 5 answers, got ${submission.answers.length}. There are exactly 5 questions in QUESTIONS.json.`,
+      });
+    }
+
+    for (let i = 0; i < submission.answers.length; i++) {
+      const entry = submission.answers[i] as Record<string, unknown>;
+      if (entry.question_id === undefined || entry.question_id === null) {
+        warnings.push({
+          severity: "error",
+          field: `answers[${i}].question_id`,
+          message: `Answer at index ${i} is missing "question_id". Each entry must include the numeric question ID.`,
+        });
+      }
+      if (!entry.answer) {
+        warnings.push({
+          severity: "error",
+          field: `answers[${i}].answer`,
+          message: `Answer at index ${i} is missing "answer". Each entry must include your answer as a string.`,
+        });
+      }
+      if (!Array.isArray(entry.sources)) {
+        warnings.push({
+          severity: "warning",
+          field: `answers[${i}].sources`,
+          message: `Answer at index ${i} is missing "sources" array. Include source document filenames for citation credit.`,
+        });
+      }
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

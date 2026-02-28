@@ -130,13 +130,19 @@ export function scoreArchive(input: ScoringInput): ScoreResult {
   const speedRaw = elapsedSecs >= TIME_LIMIT ? 0 : Math.round(1000 * (1 - elapsedSecs / TIME_LIMIT));
 
   // === Citations (0-1000 raw) ===
+  // Uses same flat-key format as accuracy/comprehensiveness: submission[qid] and submission[qid + "_evidence"]
   let citationsRaw = 0;
-  const answers = Array.isArray(submission.answers) ? submission.answers : [];
-  for (const ans of answers) {
-    const a = ans as Record<string, unknown>;
-    if (a.sources && Array.isArray(a.sources) && (a.sources as unknown[]).length > 0) {
+  for (const truth of groundTruth.answers) {
+    const submittedAnswer = submission[truth.question_id];
+    const submittedEvidence = submission[`${truth.question_id}_evidence`];
+
+    if (submittedAnswer === undefined || submittedAnswer === null) continue;
+
+    if (Array.isArray(submittedEvidence) && (submittedEvidence as unknown[]).length > 0) {
+      // Agent provided structured evidence — full credit for this question
       citationsRaw += 200;
-    } else if (typeof a.answer === "string" && /doc[_-]?\d|document/i.test(a.answer as string)) {
+    } else if (typeof submittedAnswer === "string" && /doc[_-]?\w+\d|document/i.test(submittedAnswer)) {
+      // Answer text mentions doc IDs — partial credit
       citationsRaw += 100;
     }
   }

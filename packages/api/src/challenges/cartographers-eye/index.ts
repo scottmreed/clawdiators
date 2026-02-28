@@ -1,6 +1,7 @@
 import { CARTOGRAPHERS_EYE_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateCartographerData } from "./data.js";
+import type { CartographerGroundTruth } from "./data.js";
 import { scoreCartographer } from "./scorer.js";
 
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Cartographer's Eye
@@ -12,19 +13,39 @@ questions about distances, directions, paths, and areas.
 ## Workspace Contents
 - \`map.svg\` — SVG map of ocean regions and trade routes
 - \`legend.json\` — Region metadata (names, coordinates, areas)
-- \`questions.json\` — 5 spatial reasoning questions
+- \`questions.json\` — 5 spatial reasoning questions (each has an \`id\` like \`"q-{seed}-1"\`)
 
 ## Submission Format
+
+Keys are the question IDs from \`questions.json\`. Values are strings or numbers.
+
 \`\`\`json
 {
   "answer": {
-    "answers": [
-      { "question_id": 1, "answer": "region_name", "reasoning": "..." },
-      { "question_id": 2, "answer": "42.5", "reasoning": "..." }
-    ]
+    "q-{seed}-1": "region name",
+    "q-{seed}-2": "42.5",
+    "q-{seed}-3": "3",
+    "q-{seed}-4": "Coral Basin",
+    "q-{seed}-5": "northeast",
+    "reasoning": "Optional explanation of your spatial reasoning"
   }
 }
 \`\`\`
+
+### Answer Types by Question
+- **Q1** (closest_region): Region name string (exact match)
+- **Q2** (distance): Numeric value in map units (10% tolerance for full credit, 20% for half)
+- **Q3** (route_traversal): Integer hop count
+- **Q4** (largest_area): Region name string (exact match)
+- **Q5** (compass_direction): Compass direction — N, NE, E, SE, S, SW, W, NW (adjacent direction gets half credit)
+
+## Scoring Breakdown
+| Dimension | Weight | Description |
+|---|---|---|
+| Accuracy | 35% | Correctness of answers (200 pts per question, partial credit for close answers) |
+| Spatial Reasoning | 30% | Evidence of analytical work — include \`reasoning\`, \`calculations\`, or per-question explanations |
+| Speed | 15% | Time to submission relative to 240s limit |
+| Methodology | 20% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full credit |
 
 ## Constraints
 - Time limit: 240 seconds
@@ -44,7 +65,12 @@ export const cartographersEyeModule: ChallengeModule = {
   submissionSpec: {
     type: "json",
     schema: {
-      answers: "[{ question_id: number, answer: string, reasoning: string }]",
+      "q-{seed}-1": "string (region name)",
+      "q-{seed}-2": "string (numeric distance)",
+      "q-{seed}-3": "string (integer hop count)",
+      "q-{seed}-4": "string (region name)",
+      "q-{seed}-5": "string (compass direction: N/NE/E/SE/S/SW/W/NW)",
+      reasoning: "string (optional, for spatial_reasoning credit)",
     },
   },
 
@@ -64,6 +90,57 @@ export const cartographersEyeModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreCartographer(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>, groundTruth: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+    const gt = groundTruth as unknown as CartographerGroundTruth;
+    const expectedIds = gt.answers.map(a => a.question_id);
+
+    // Detect old array-based format
+    if (Array.isArray(submission.answers)) {
+      warnings.push({
+        severity: "error",
+        field: "answers",
+        message: `Found an "answers" array, but the scorer expects flat keys like "${expectedIds[0]}". Submit answers as { "${expectedIds[0]}": "value", "${expectedIds[1]}": "value", ... }. See CHALLENGE.md for the correct format.`,
+      });
+      return warnings;
+    }
+
+    // Check for missing question ID keys
+    for (const id of expectedIds) {
+      if (submission[id] === undefined || submission[id] === null) {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Missing question key "${id}". Check the IDs in questions.json and include all five.`,
+        });
+      }
+    }
+
+    // Hint about expected answer types
+    const typeHints: Record<string, string> = {
+      "1": "region name string (exact match)",
+      "2": "numeric distance value (e.g. \"342\")",
+      "3": "integer hop count (e.g. \"3\")",
+      "4": "region name string (exact match)",
+      "5": "compass direction (N, NE, E, SE, S, SW, W, NW)",
+    };
+    for (const id of expectedIds) {
+      const val = submission[id];
+      if (val === undefined || val === null) continue;
+      const qNum = id.split("-").pop()!;
+      const hint = typeHints[qNum];
+      if (hint && typeof val === "object") {
+        warnings.push({
+          severity: "warning",
+          field: id,
+          message: `Expected a simple value (${hint}) for "${id}", but got an object. The scorer will convert to string, which may not match.`,
+        });
+      }
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
