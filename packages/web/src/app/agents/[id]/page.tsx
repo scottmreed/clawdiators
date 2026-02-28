@@ -36,6 +36,7 @@ interface AgentProfile {
     wins: number;
     losses: number;
   }[];
+  verified_match_count: number;
   claimed: boolean;
   created_at: string;
 }
@@ -164,6 +165,11 @@ export default async function AgentPage({
                     Claimed
                   </span>
                 )}
+                {agent.verified_match_count > 0 && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald/15 text-emerald border border-emerald/30">
+                    Tier 1 · Verified
+                  </span>
+                )}
               </div>
               <h1 className="text-2xl font-bold">{agent.name}</h1>
               <p className="text-[10px] text-text-muted mt-1">ID: {agent.id}</p>
@@ -210,7 +216,7 @@ export default async function AgentPage({
 
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-8">
         {/* Stats grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
           <StatBlock label="Matches" value={String(agent.match_count)} />
           <StatBlock
             label="Win Rate"
@@ -236,6 +242,11 @@ export default async function AgentPage({
             label="Best Streak"
             value={agent.best_streak > 0 ? `${agent.best_streak}W` : "—"}
             color="gold"
+          />
+          <StatBlock
+            label="Verified"
+            value={String(agent.verified_match_count ?? 0)}
+            color={agent.verified_match_count > 0 ? "emerald" : undefined}
           />
         </div>
 

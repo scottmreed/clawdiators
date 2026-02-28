@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
-import { db, matches, agents, challenges, challengeTracks, trackProgress } from "@clawdiators/db";
-import { ELO_DEFAULT, HEARTBEAT_GRACE_PERIOD_MS } from "@clawdiators/shared";
+import { eq, desc, and, sql, isNull } from "drizzle-orm";
+import { db, matches, agents, challenges, challengeTracks, trackProgress, verificationImages } from "@clawdiators/db";
+import { ELO_DEFAULT, DIFFICULTY_ELO, HEARTBEAT_GRACE_PERIOD_MS, VERIFIED_ELO_BONUS } from "@clawdiators/shared";
 import { authMiddleware } from "../middleware/auth.js";
 import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { generateBoutName, generateFlavourText, computeTitle, computeAllTitles } from "../services/whimsy.js";
@@ -11,12 +11,15 @@ import { calculateElo, scoreToResult } from "../services/elo.js";
 import { getChallenge } from "../challenges/registry.js";
 import { evaluate } from "../challenges/evaluator.js";
 import { recalibrateChallenge } from "../services/calibration.js";
+import { generateNonce, verifyAttestation } from "../services/verification.js";
 
 export const matchRoutes = new Hono();
 
 // POST /matches/enter — enter a match
 const enterSchema = z.object({
   challenge_slug: z.string().optional().default("cipher-forge"),
+  memoryless: z.boolean().optional().default(false),
+  verified: z.boolean().optional().default(false),
 });
 
 matchRoutes.post(
@@ -25,7 +28,7 @@ matchRoutes.post(
   zValidator("json", enterSchema),
   async (c) => {
     const agent = c.get("agent");
-    const { challenge_slug } = c.req.valid("json");
+    const { challenge_slug, memoryless, verified } = c.req.valid("json");
 
     // Reject archived agents
     if (agent.archivedAt) {
@@ -46,6 +49,12 @@ matchRoutes.post(
     }
     if (!challenge.active) {
       return errorEnvelope(c, "Challenge is not active yet", 400, "Patience, gladiator. This trial is not yet open.");
+    }
+
+    // Enforce verification policy
+    if (challenge.verificationPolicy?.mode === "required" && !verified) {
+      return errorEnvelope(c, "This challenge requires verified execution.", 403,
+        "The arena demands proof. Run this challenge in the verified arena-runner.");
     }
 
     // Look up the challenge module
@@ -86,6 +95,8 @@ matchRoutes.post(
           challenge_md: existingMod?.workspaceSpec?.challengeMd ?? null,
           submission_spec: existingMod?.submissionSpec ?? null,
           submit_url: `/api/v1/matches/${existingActive.id}/submit`,
+          attempt_number: existingActive.attemptNumber,
+          memoryless: existingActive.memoryless,
           challenge: existingChallenge ? {
             slug: existingChallenge.slug,
             name: existingChallenge.name,
@@ -118,6 +129,20 @@ matchRoutes.post(
     const data = mod.generateData(seed, effectiveConfig);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + challenge.timeLimitSecs * 1000);
+    const verificationNonce = verified ? generateNonce() : null;
+
+    // Compute attempt number (count previous completed matches for this agent+challenge)
+    const [{ count: previousCompleted }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.agentId, agent.id),
+          eq(matches.challengeId, challenge.id),
+          eq(matches.status, "completed"),
+        ),
+      );
+    const attemptNumber = previousCompleted + 1;
 
     const [match] = await db
       .insert(matches)
@@ -131,6 +156,11 @@ matchRoutes.post(
         startedAt: now,
         expiresAt,
         variantId,
+        attemptNumber,
+        memoryless,
+        verified,
+        verificationNonce,
+        verificationStatus: verified ? "pending" : "unverified",
       })
       .returning();
 
@@ -161,6 +191,18 @@ matchRoutes.post(
         challenge_md: mod.workspaceSpec?.challengeMd ?? null,
         submission_spec: mod.submissionSpec ?? null,
         submit_url: `/api/v1/matches/${match.id}/submit`,
+        attempt_number: attemptNumber,
+        memoryless,
+        verified,
+        verification: verified ? {
+          nonce: verificationNonce,
+          image: "clawdiators/arena-runner:latest",
+          runner_url: "ghcr.io/clawdiators/arena-runner:latest",
+        } : undefined,
+        constraints: challenge.constraints ? {
+          ...challenge.constraints,
+          advisory: !verified,
+        } : undefined,
         ...extraUrls,
       },
       201,
@@ -189,6 +231,7 @@ const submitSchema = z.object({
     harness_id: z.string().optional(),
     wall_clock_secs: z.number().optional(),
     replay_log: z.array(replayStepSchema).max(1000).optional(),
+    attestation: z.record(z.unknown()).optional(),
   }).optional(),
 });
 
@@ -261,19 +304,65 @@ matchRoutes.post(
       ? mod.validateSubmission(answer, data.groundTruth)
       : [];
 
-    const { result: evalResult, log: evaluationLog } = await evaluate(mod, scoringInput);
+    const { result: evalResult, log: evaluationLog } = await evaluate(mod, scoringInput, {
+      verified: match.verified,
+      constraints: challenge.constraints as import("@clawdiators/shared").ChallengeConstraints | null,
+      attestation: metadata?.attestation as Record<string, unknown> | null ?? null,
+    });
     const { breakdown } = evalResult;
 
     // Determine result (solo calibration)
     const result = scoreToResult(breakdown.total);
 
-    // Calculate Elo change
+    // IRT-Elo: use challenge difficulty as opponent rating
+    // See docs/scoring-methodology.md for rationale
+    const challengeDifficulty = (challenge.calibratedDifficulty ?? challenge.difficulty) as string;
+    const opponentElo = DIFFICULTY_ELO[challengeDifficulty] ?? ELO_DEFAULT;
     const eloResult = calculateElo(
       agent.elo,
-      ELO_DEFAULT, // phantom opponent at 1000
+      opponentElo,
       result,
       agent.matchCount,
     );
+
+    // Verification: run attestation checks if match was entered as verified
+    let verificationStatus: string = match.verified ? "failed" : "unverified";
+    let verificationFields: Record<string, unknown> = {};
+    let eloChange = eloResult.change;
+
+    if (match.verified) {
+      const attestationPayload = metadata?.attestation;
+      if (attestationPayload && match.verificationNonce) {
+        // Load known digests from DB
+        const knownImages = await db.query.verificationImages.findMany({
+          where: isNull(verificationImages.deprecatedAt),
+        });
+        const knownDigests = knownImages.map((img) => img.digest);
+        const vResult = verifyAttestation(
+          attestationPayload as unknown as import("@clawdiators/shared").VerifiedAttestation,
+          match.verificationNonce,
+          match.startedAt,
+          match.expiresAt,
+          knownDigests,
+        );
+        verificationStatus = vResult.status;
+        const att = attestationPayload as Record<string, unknown>;
+        const llmCalls = att.llm_calls as Array<{ model?: string }> | undefined;
+        verificationFields = {
+          attestation: attestationPayload,
+          verifiedAt: new Date(),
+          verifiedModel: llmCalls?.[0]?.model ?? null,
+          verifiedInputTokens: typeof att.total_input_tokens === "number" ? att.total_input_tokens : null,
+          verifiedOutputTokens: typeof att.total_output_tokens === "number" ? att.total_output_tokens : null,
+          verifiedLlmCalls: typeof att.total_llm_calls === "number" ? att.total_llm_calls : null,
+        };
+        // Apply 1.1x Elo bonus for verified wins
+        if (vResult.status === "verified" && eloResult.change > 0) {
+          eloChange = Math.round(eloResult.change * VERIFIED_ELO_BONUS);
+        }
+      }
+      // No attestation submitted → verification failed (already default)
+    }
 
     // Generate flavour text
     const flavourText = generateFlavourText(
@@ -284,6 +373,11 @@ matchRoutes.post(
       eloResult.change,
       match.seed,
     );
+
+    // Apply verified Elo bonus to final rating if applicable
+    const finalEloAfter = eloChange !== eloResult.change
+      ? Math.max(100, agent.elo + eloChange)
+      : eloResult.newRating;
 
     // Update match
     await db
@@ -296,13 +390,15 @@ matchRoutes.post(
         score: breakdown.total,
         scoreBreakdown: breakdown,
         eloBefore: agent.elo,
-        eloAfter: eloResult.newRating,
-        eloChange: eloResult.change,
+        eloAfter: finalEloAfter,
+        eloChange,
         flavourText,
         completedAt: now,
         evaluationLog,
         submissionMetadata: metadata ?? null,
         harnessId: metadata?.harness_id ?? null,
+        verificationStatus,
+        ...verificationFields,
       })
       .where(eq(matches.id, matchId));
 
@@ -328,7 +424,7 @@ matchRoutes.post(
       ...agent.eloHistory,
       {
         ts: now.toISOString(),
-        elo: eloResult.newRating,
+        elo: finalEloAfter,
         matchId: match.id,
       },
     ];
@@ -337,7 +433,7 @@ matchRoutes.post(
     const agentStats = {
       matchCount: newMatchCount,
       winCount: newWinCount,
-      elo: eloResult.newRating,
+      elo: finalEloAfter,
       bestStreak: newBestStreak,
     };
     const newTitle = computeTitle(agentStats);
@@ -346,7 +442,7 @@ matchRoutes.post(
     await db
       .update(agents)
       .set({
-        elo: eloResult.newRating,
+        elo: finalEloAfter,
         matchCount: newMatchCount,
         winCount: newWinCount,
         drawCount: newDrawCount,
@@ -454,8 +550,17 @@ matchRoutes.post(
         score: breakdown.total,
         score_breakdown: breakdown,
         elo_before: agent.elo,
-        elo_after: eloResult.newRating,
-        elo_change: eloResult.change,
+        elo_after: finalEloAfter,
+        elo_change: eloChange,
+        opponent_elo: opponentElo,
+        attempt_number: match.attemptNumber,
+        memoryless: match.memoryless,
+        verified: match.verified,
+        verification_status: verificationStatus,
+        verified_model: (verificationFields.verifiedModel as string | null) ?? null,
+        verified_input_tokens: (verificationFields.verifiedInputTokens as number | null) ?? null,
+        verified_output_tokens: (verificationFields.verifiedOutputTokens as number | null) ?? null,
+        verified_llm_calls: (verificationFields.verifiedLlmCalls as number | null) ?? null,
         title: newTitle,
         flavour_text: flavourText,
         evaluation_log: evaluationLog,
@@ -618,6 +723,10 @@ matchRoutes.post(
     if (!match) return errorEnvelope(c, "Match not found", 404);
     if (match.agentId !== agent.id) return errorEnvelope(c, "Not your match", 403);
     if (match.status !== "completed") return errorEnvelope(c, "Match not completed", 400);
+    if (match.memoryless) {
+      return errorEnvelope(c, "Reflections are not allowed on memoryless matches.", 403,
+        "In memoryless mode, lessons are not retained.");
+    }
 
     // Add reflection to memory
     const memory = { ...agent.memory };
@@ -676,6 +785,15 @@ matchRoutes.get("/:matchId", async (c) => {
     challenge_slug: challenge?.slug ?? null,
     match_type: challenge?.matchType ?? "single",
     variant_id: match.variantId ?? null,
+    attempt_number: match.attemptNumber,
+    memoryless: match.memoryless,
+    verified: match.verified,
+    verification_status: match.verificationStatus,
+    verified_model: match.verifiedModel ?? null,
+    verified_input_tokens: match.verifiedInputTokens ?? null,
+    verified_output_tokens: match.verifiedOutputTokens ?? null,
+    verified_llm_calls: match.verifiedLlmCalls ?? null,
+    attestation: match.attestation ?? null,
     agent: agent
       ? { id: agent.id, name: agent.name, title: agent.title }
       : null,
@@ -697,6 +815,22 @@ matchRoutes.get("/:matchId", async (c) => {
     started_at: match.startedAt,
     submitted_at: match.submittedAt,
     completed_at: match.completedAt,
+  });
+});
+
+// GET /matches/:matchId/attestation — get attestation data
+matchRoutes.get("/:matchId/attestation", async (c) => {
+  const matchId = c.req.param("matchId");
+  const match = await db.query.matches.findFirst({
+    where: eq(matches.id, matchId),
+  });
+  if (!match) return errorEnvelope(c, "Match not found", 404);
+  if (!match.attestation) return errorEnvelope(c, "No attestation for this match", 404);
+  return envelope(c, {
+    match_id: match.id,
+    verification_status: match.verificationStatus,
+    verified_at: match.verifiedAt?.toISOString() ?? null,
+    attestation: match.attestation,
   });
 });
 
@@ -740,6 +874,10 @@ matchRoutes.get("/", async (c) => {
       result: m.result,
       score: m.score,
       elo_change: m.eloChange,
+      attempt_number: m.attemptNumber,
+      memoryless: m.memoryless,
+      verified: m.verified,
+      verification_status: m.verificationStatus,
       flavour_text: m.flavourText,
       started_at: m.startedAt,
       completed_at: m.completedAt,

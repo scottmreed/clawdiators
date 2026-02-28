@@ -2,6 +2,8 @@ import { apiFetch } from "@/lib/api";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ReplayViewer } from "@/components/replay-viewer";
+import { VerifiedBadge } from "@/components/verified-badge";
+import { AttestationViewer } from "@/components/attestation-viewer";
 
 interface ScoringDimension {
   key: string;
@@ -75,6 +77,14 @@ interface MatchDetail {
   started_at: string;
   submitted_at: string | null;
   completed_at: string | null;
+  // Verification fields
+  verified: boolean;
+  verification_status: string;
+  verified_model: string | null;
+  verified_input_tokens: number | null;
+  verified_output_tokens: number | null;
+  verified_llm_calls: number | null;
+  attestation: Record<string, unknown> | null;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -161,9 +171,25 @@ export default async function MatchReplayPage({
               <p className="text-[10px] text-text-muted mb-1">
                 Match {match.id}
               </p>
-              <h1 className="text-2xl font-bold text-gold">
-                {match.bout_name}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gold">
+                  {match.bout_name}
+                </h1>
+                {match.verified !== undefined && (
+                  <VerifiedBadge
+                    status={
+                      !match.verified
+                        ? "unverified"
+                        : match.verification_status === "verified"
+                          ? "verified"
+                          : match.verification_status === "failed"
+                            ? "failed"
+                            : "pending"
+                    }
+                    size="md"
+                  />
+                )}
+              </div>
               {match.agent && (
                 <a
                   href={`/agents/${match.agent.id}`}
@@ -344,6 +370,33 @@ export default async function MatchReplayPage({
                   {match.evaluation_log.stdout}
                 </pre>
               </details>
+            )}
+          </div>
+        )}
+
+        {/* Verification */}
+        {match.verified !== undefined && (
+          <div className="card p-5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
+              Verification
+            </h2>
+            {!match.verified ? (
+              <p className="text-xs text-text-muted">
+                Unverified match. Run with{" "}
+                <code className="text-emerald">arena-runner</code> for a verified
+                result and Elo bonus.
+              </p>
+            ) : match.verification_status === "verified" && match.attestation ? (
+              <AttestationViewer
+                attestation={match.attestation as any}
+                raw={match.attestation}
+              />
+            ) : match.verification_status === "failed" ? (
+              <p className="text-xs text-coral">
+                Verification failed. Attestation did not pass all checks.
+              </p>
+            ) : (
+              <p className="text-xs text-gold">Attestation not yet submitted.</p>
             )}
           </div>
         )}

@@ -49,6 +49,21 @@ export interface MatchEntry {
   challenge_md: string | null;
   submission_spec: Record<string, unknown> | null;
   submit_url: string;
+  attempt_number: number;
+  memoryless: boolean;
+  verified: boolean;
+  verification?: {
+    nonce: string;
+    image: string;
+    runner_url: string;
+  };
+  constraints?: {
+    tokenBudget?: number;
+    maxLlmCalls?: number;
+    allowedModels?: string[];
+    networkAccess?: boolean;
+    advisory?: boolean;
+  };
 }
 
 export interface MatchResult {
@@ -60,6 +75,15 @@ export interface MatchResult {
   elo_before: number;
   elo_after: number;
   elo_change: number;
+  opponent_elo: number;
+  attempt_number: number;
+  memoryless: boolean;
+  verified: boolean;
+  verification_status: string;
+  verified_model: string | null;
+  verified_input_tokens: number | null;
+  verified_output_tokens: number | null;
+  verified_llm_calls: number | null;
   title: string;
   flavour_text: string;
 }
@@ -167,9 +191,11 @@ export class ClawdiatorsClient {
   }
 
   /** Enter a match for a challenge. */
-  async enterMatch(slug: string): Promise<MatchEntry> {
+  async enterMatch(slug: string, opts?: { memoryless?: boolean; verified?: boolean }): Promise<MatchEntry> {
     return this.request<MatchEntry>("POST", "/api/v1/matches/enter", {
       challenge_slug: slug,
+      ...(opts?.memoryless !== undefined && { memoryless: opts.memoryless }),
+      ...(opts?.verified !== undefined && { verified: opts.verified }),
     });
   }
 
@@ -209,12 +235,18 @@ export class ClawdiatorsClient {
       harness_id?: string;
       wall_clock_secs?: number;
       replay_log?: ReplayStep[];
+      attestation?: Record<string, unknown>;
     },
   ): Promise<MatchResult> {
     return this.request<MatchResult>("POST", `/api/v1/matches/${matchId}/submit`, {
       answer,
       metadata,
     });
+  }
+
+  /** Get attestation data for a verified match. */
+  async getAttestation(matchId: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>("GET", `/api/v1/matches/${matchId}/attestation`, undefined, false);
   }
 
   /** Submit a checkpoint for multi-checkpoint matches. */
@@ -265,9 +297,11 @@ export class ClawdiatorsClient {
       workspaceDir?: string;
       harnessId?: string;
       modelId?: string;
+      memoryless?: boolean;
+      verified?: boolean;
     },
   ): Promise<MatchResult> {
-    const match = await this.enterMatch(slug);
+    const match = await this.enterMatch(slug, { memoryless: opts?.memoryless, verified: opts?.verified });
     const dir = opts?.workspaceDir ?? `/tmp/clawdiators-${match.match_id}`;
 
     await this.downloadWorkspace(match.workspace_url, dir);
@@ -280,6 +314,65 @@ export class ClawdiatorsClient {
       harness_id: opts?.harnessId,
       model_id: opts?.modelId,
       wall_clock_secs: wallClockSecs,
+    });
+  }
+
+  /**
+   * Verified competition lifecycle.
+   * Starts the arena-runner proxy container, runs the solver with proxy env vars,
+   * reads the attestation, and submits with it.
+   *
+   * The solver receives proxyEnv — pass these to any subprocess that makes LLM calls,
+   * or set them on process.env for in-process LLM clients.
+   */
+  async competeVerified(
+    slug: string,
+    solver: (
+      workspaceDir: string,
+      objective: string,
+      proxyEnv: Record<string, string>,
+    ) => Promise<Record<string, unknown>>,
+    opts?: {
+      workspaceDir?: string;
+      harnessId?: string;
+      modelId?: string;
+      memoryless?: boolean;
+      image?: string;
+      port?: number;
+    },
+  ): Promise<MatchResult> {
+    const { VerifiedRunner } = await import("./verified-runner.js");
+
+    const match = await this.enterMatch(slug, { verified: true, memoryless: opts?.memoryless });
+    const dir = opts?.workspaceDir ?? `/tmp/clawdiators-${match.match_id}`;
+
+    await this.downloadWorkspace(match.workspace_url, dir);
+
+    const runner = await VerifiedRunner.create(match, {
+      image: opts?.image,
+      port: opts?.port,
+    });
+
+    const startTime = Date.now();
+    let answer: Record<string, unknown>;
+
+    try {
+      answer = await solver(dir, match.objective, runner.getEnv());
+    } catch (err) {
+      await runner.stop().catch(() => {});
+      throw err;
+    }
+
+    const wallClockSecs = Math.round((Date.now() - startTime) / 1000);
+
+    // Finalize: writes sentinel, waits for proxy to write attestation.json, reads it
+    const attestation = await runner.finalize();
+
+    return this.submitAnswer(match.match_id, answer, {
+      harness_id: opts?.harnessId,
+      model_id: opts?.modelId,
+      wall_clock_secs: wallClockSecs,
+      attestation: attestation as Record<string, unknown>,
     });
   }
 }

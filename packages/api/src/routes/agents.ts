@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db, agents, matches, challenges } from "@clawdiators/db";
 import {
@@ -128,8 +128,22 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
 });
 
 // GET /agents/me (authenticated)
-agentRoutes.get("/me", authMiddleware, (c) => {
+agentRoutes.get("/me", authMiddleware, async (c) => {
   const agent = c.get("agent");
+
+  // Check for active memoryless match — redact memory if found
+  const activeMemoryless = await db.query.matches.findFirst({
+    where: and(
+      eq(matches.agentId, agent.id),
+      eq(matches.status, "active"),
+      eq(matches.memoryless, true),
+    ),
+  });
+  const memoryRedacted = !!activeMemoryless;
+  const memoryToReturn = memoryRedacted
+    ? { reflections: [], strategies: [], rivals: [], stats_summary: null }
+    : agent.memory;
+
   return envelope(c, {
     id: agent.id,
     name: agent.name,
@@ -149,7 +163,8 @@ agentRoutes.get("/me", authMiddleware, (c) => {
     title: agent.title,
     titles: agent.titles,
     rivals: agent.rivals,
-    memory: agent.memory,
+    memory: memoryToReturn,
+    memory_redacted: memoryRedacted,
     claimed: !!agent.claimedBy,
     archived_at: agent.archivedAt,
     created_at: agent.createdAt,
@@ -376,6 +391,24 @@ agentRoutes.patch(
   zValidator("json", memorySchema),
   async (c) => {
     const agent = c.get("agent");
+
+    // Block memory writes during active memoryless matches
+    const activeMemoryless = await db.query.matches.findFirst({
+      where: and(
+        eq(matches.agentId, agent.id),
+        eq(matches.status, "active"),
+        eq(matches.memoryless, true),
+      ),
+    });
+    if (activeMemoryless) {
+      return errorEnvelope(
+        c,
+        "Memory writes are blocked during memoryless matches.",
+        403,
+        "In memoryless mode, the mind remains untouched.",
+      );
+    }
+
     const updates = c.req.valid("json");
 
     const memory = { ...agent.memory };
@@ -409,6 +442,18 @@ agentRoutes.get("/:id", async (c) => {
     );
   }
 
+  // Count verified completed matches
+  const [{ count: verifiedMatchCount }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(matches)
+    .where(
+      and(
+        eq(matches.agentId, agent.id),
+        eq(matches.status, "completed"),
+        eq(matches.verified, true),
+      ),
+    );
+
   return envelope(c, {
     id: agent.id,
     name: agent.name,
@@ -429,6 +474,7 @@ agentRoutes.get("/:id", async (c) => {
     title: agent.title,
     titles: agent.titles,
     rivals: agent.rivals,
+    verified_match_count: verifiedMatchCount,
     claimed: !!agent.claimedBy,
     archived_at: agent.archivedAt,
     created_at: agent.createdAt,
