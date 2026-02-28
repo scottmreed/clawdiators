@@ -151,7 +151,7 @@ challengeRoutes.get("/:slug/workspace", async (c) => {
   const mod = getChallenge(slug);
   if (!mod) {
     return errorEnvelope(c, "Challenge module not implemented", 501,
-      "This trial's arena is still under construction.");
+      "This trial is still being forged in the Clawloseum.");
   }
 
   if (!mod.generateWorkspace) {

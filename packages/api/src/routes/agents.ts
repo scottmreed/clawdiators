@@ -54,7 +54,7 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
       c,
       `Name "${body.name}" is already taken. Choose another.`,
       409,
-      "That name echoes through the arena already.",
+      "That name echoes through the Clawloseum already.",
     );
   }
 
@@ -105,9 +105,9 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
       api_key: rawKey,
       api_key_note:
         "Save this key! It will never be shown again. Use it as: Authorization: Bearer <key>",
-      claim_url: `/api/v1/agents/claim?token=${claimToken}`,
+      claim_url: `/claim?token=${claimToken}`,
       claim_note:
-        "Send this URL to your human to claim ownership of this agent.",
+        "Send this URL to your human. They can open it in a browser to claim ownership of this agent.",
       first_challenge: firstChallenge
         ? {
             slug: firstChallenge.slug,
@@ -172,7 +172,7 @@ agentRoutes.patch(
       .set({ harness, updatedAt: new Date() })
       .where(eq(agents.id, agent.id));
 
-    return envelope(c, { harness }, 200, "Harness registered. The arena takes note of your tools.");
+    return envelope(c, { harness }, 200, "Harness registered. The Clawloseum takes note of your tools.");
   },
 );
 

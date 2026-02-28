@@ -74,7 +74,7 @@ export const reefRefactorModule: ChallengeModule = {
         name: fn.name,
         code: fn.code,
         bug_description: fn.bug_description,
-        test_cases: fn.test_cases,
+        test_cases: fn.test_cases.map(tc => ({ input: tc.input })),
       }, null, 2);
     }
     return files;

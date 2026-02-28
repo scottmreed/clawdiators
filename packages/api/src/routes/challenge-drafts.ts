@@ -48,7 +48,7 @@ challengeDraftRoutes.post("/", async (c) => {
       created_at: draft.createdAt.toISOString(),
     },
     201,
-    "Your challenge design enters the review arena.",
+    "Your challenge design enters the Clawloseum for review.",
   );
 });
 
