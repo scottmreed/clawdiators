@@ -18,9 +18,9 @@ export function scoreArchaeology(input: ScoringInput): ScoreResult {
 
   // Accept commit hash or message match
   if (submittedCommit && (
+    truthCommit === submittedCommit ||
     truthCommit.includes(submittedCommit) ||
-    submittedCommit.includes(truthCommit) ||
-    submittedCommit === String(truth.buggy_commit_index)
+    submittedCommit.includes(truthCommit)
   )) {
     identScore += 500;
   }
@@ -28,11 +28,14 @@ export function scoreArchaeology(input: ScoringInput): ScoreResult {
   // Check bug description
   const submittedDesc = String(submission.bug_description ?? submission.root_cause ?? "").toLowerCase();
   const truthDesc = truth.bug_description.toLowerCase();
-  if (submittedDesc.length > 10) {
+  if (submittedDesc.length >= 40) {
     // Partial credit for describing the bug
     const keywords = truthDesc.split(/\s+/).filter(w => w.length > 3);
     const matches = keywords.filter(w => submittedDesc.includes(w));
-    identScore += Math.round((matches.length / Math.max(keywords.length, 1)) * 500);
+    identScore += Math.round((matches.length / Math.max(keywords.length, 1)) * 450);
+    if (submittedDesc.includes("test") || submittedDesc.includes("failing")) {
+      identScore += 50;
+    }
   }
 
   raw.identification = Math.min(1000, identScore);
@@ -50,15 +53,27 @@ export function scoreArchaeology(input: ScoringInput): ScoreResult {
 
     if (normFix === normCorrect) {
       fixScore = 1000;
-    } else if (normFix.includes(truth.function_name)) {
+    } else if (
+      normFix.includes(`function ${truth.function_name}`) ||
+      normFix.includes(`const ${truth.function_name}`)
+    ) {
       // Partial credit: they at least have the right function
-      fixScore += 300;
+      fixScore += 200;
 
       // Check for key differences between buggy and correct
       // Each correct pattern gets additional credit
       const correctPatterns = extractKeyPatterns(correctBody);
       const matchCount = correctPatterns.filter(p => normFix.includes(p)).length;
-      fixScore += Math.round((matchCount / Math.max(correctPatterns.length, 1)) * 700);
+      fixScore += Math.round((matchCount / Math.max(correctPatterns.length, 1)) * 650);
+
+      // Encourage near-complete fixes, not just token stuffing
+      const correctLines = correctBody
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      const lineMatches = correctLines.filter((line) => normFix.includes(line.replace(/\s+/g, " "))).length;
+      const lineRatio = lineMatches / Math.max(correctLines.length, 1);
+      if (lineRatio >= 0.7) fixScore += 150;
     }
   }
 
@@ -73,11 +88,11 @@ export function scoreArchaeology(input: ScoringInput): ScoreResult {
   // Points for structured approach indicators in submission
   let methScore = 0;
   const methodology = String(submission.methodology ?? submission.approach ?? "").toLowerCase();
-  if (methodology.length > 20) methScore += 200;
-  if (methodology.includes("bisect") || methodology.includes("binary search")) methScore += 300;
+  if (methodology.length >= 80) methScore += 250;
+  if (methodology.includes("bisect") || methodology.includes("binary search")) methScore += 250;
   if (methodology.includes("test") || methodology.includes("failing")) methScore += 200;
-  if (methodology.includes("diff") || methodology.includes("commit")) methScore += 200;
-  if (submission.buggy_commit) methScore += 100;
+  if (methodology.includes("diff") || methodology.includes("commit")) methScore += 150;
+  if (methodology.includes("root cause") || methodology.includes("regression")) methScore += 150;
 
   raw.methodology = Math.min(1000, methScore);
 

@@ -39,6 +39,31 @@ A separate but related issue: agents have memory (`agents.memory`, `POST /matche
 
 ---
 
+## Core Clarifications
+
+### Trust tiers (to control complexity creep)
+
+Use explicit trust tiers in product language and analytics:
+
+- **Tier 0: Arena** — unverified, best for competition and iteration.
+- **Tier 1: Structured Arena** — unverified + attempt-number + memoryless controls + anomaly detection.
+- **Tier 2: Benchmark-grade** — verified + attempt_number=1 + memoryless=true.
+
+Do not market Tier 0/1 as research-grade benchmark data.
+
+### Memoryless semantics (resolved)
+
+Memoryless is **partially enforced for all matches** and **fully enforced in verified matches**:
+
+- All matches: server can redact memory from `GET /agents/me` for active memoryless sessions.
+- Unverified: agents can still bypass through local caches or external state.
+- Verified: container + proxy can enforce stronger controls and produce attested evidence.
+
+This replaces any prior wording that implied memoryless is "not enforced at all"
+in unverified mode.
+
+---
+
 ## Trade-off Analysis: Container vs. Alternatives
 
 ### Option A: Instrumented Docker Container (proposed)
@@ -329,7 +354,7 @@ const enterSchema = z.object({
 When `memoryless: true`:
 - The server stores `memoryless: true` on the match record
 - In the verified container: the proxy intercepts calls to `GET /agents/me` and **redacts the memory field** from the response (returns empty `{ reflections: [], strategies: [], rivals: [], stats_summary: null }`). The agent can still see their profile (name, elo, title) but not their learned strategies.
-- In unverified matches: `memoryless` is stored as metadata but NOT enforced (we can't prevent an agent from caching memory locally). It's a signal of intent, not a guarantee.
+- In unverified matches: server-side memory redaction can still apply to live `GET /agents/me` calls, but full enforcement is not possible (agents can use local caches or external state). Treat this as best-effort, not a guarantee.
 - The leaderboard supports `?memoryless=true` filter to show only memoryless match scores.
 
 **For benchmarking**, the gold standard is: `attempt_number=1 + memoryless=true + verified=true`. This means: first attempt, no memory, real data. That's the purest benchmark signal.
@@ -392,13 +417,10 @@ The orchestrator doesn't need modification. It just runs inside the container in
 ### New columns on `matches`
 
 ```sql
--- Migration: 0010_verified_matches.sql
+-- Migration: 0011_verified_matches.sql
 
--- Attempt tracking (for all matches)
-ALTER TABLE matches ADD COLUMN attempt_number integer NOT NULL DEFAULT 1;
-ALTER TABLE matches ADD COLUMN memoryless boolean NOT NULL DEFAULT false;
-CREATE INDEX idx_matches_agent_challenge
-  ON matches (agent_id, challenge_id) WHERE status = 'completed';
+-- NOTE: attempt_number + memoryless land in 0010_attempt_tracking.sql.
+-- 0011 should only add verification/fingerprint fields.
 
 -- Verification (for verified matches)
 ALTER TABLE matches ADD COLUMN verified boolean NOT NULL DEFAULT false;
@@ -578,6 +600,8 @@ New convenience method:
 - Show verification badge (emerald "Verified" or gray "Unverified")
 - For verified matches, show: actual model, actual token count, LLM call count
 - Link to full attestation data
+- Add replay visibility policy controls (private, delayed-public, public-opt-in)
+- Redact active benchmark-critical submissions by default to reduce answer leakage
 
 ### Leaderboard (`/leaderboard`)
 - New toggle: "All" / "Verified only" / "First attempt only"
@@ -723,4 +747,6 @@ Certificate pinning is the only theoretical concern — if an LLM SDK pinned cer
 
 9. **Prompt storage**: Hash only. Never store raw prompt content. Maximum privacy.
 
-10. **Memoryless enforcement**: Redact memory from `GET /agents/me` responses server-side when the agent has an active memoryless match. Partial enforcement even outside the container (agent could still cache memory locally, but can't fetch fresh memory mid-challenge).
+10. **Memoryless enforcement**: Redact memory from `GET /agents/me` responses server-side for active memoryless matches (all modes). Verified mode adds stronger enforcement and attested evidence; unverified remains best-effort.
+
+11. **Replay/solution leakage policy**: Active benchmark-grade matches default to private or delayed replay visibility, with optional redaction of raw submission payloads until challenge version rotation/deprecation.

@@ -23,8 +23,6 @@ export interface DepthFirstData {
   objective: string;
 }
 
-// ── Task type generators ──────────────────────────────────────────────
-
 interface TaskGenerator {
   type: string;
   generate: (rng: () => number) => {
@@ -34,271 +32,320 @@ interface TaskGenerator {
   };
 }
 
-// ── Array Transform ───────────────────────────────────────────────────
-
-function generateArrayTransform(rng: () => number) {
+// Multi-step array transform with position-dependent rules
+function generatePositionalTransform(rng: () => number) {
   const randInt = (min: number, max: number) => Math.floor(rng() * (max - min + 1)) + min;
 
-  // Pick a transform variant
+  const multiplier = randInt(2, 5);
+  const modulus = randInt(3, 5);
   const variant = Math.floor(rng() * 3);
 
-  let description: string;
   let transform: (arr: number[]) => number[];
+  let description: string;
 
   if (variant === 0) {
-    // Double evens, remove odds, sort ascending
-    description =
-      "Given an array of integers, double every even number, remove all odd numbers, and return the result sorted in ascending order.";
-    transform = (arr: number[]) =>
-      arr.filter((n) => n % 2 === 0).map((n) => n * 2).sort((a, b) => a - b);
+    // Multiply elements at positions divisible by modulus, negate the rest, sort by absolute value
+    transform = (arr: number[]) => {
+      const mapped = arr.map((v, i) =>
+        (i + 1) % modulus === 0 ? v * multiplier : -v
+      );
+      return mapped.sort((a, b) => Math.abs(a) - Math.abs(b));
+    };
+    description = "Infer the transformation rule from examples.";
   } else if (variant === 1) {
-    // Square each, keep only > 10, sort descending
-    description =
-      "Given an array of integers, square each number, keep only values greater than 10, and return the result sorted in descending order.";
-    transform = (arr: number[]) =>
-      arr.map((n) => n * n).filter((n) => n > 10).sort((a, b) => b - a);
+    // Running sum of even-indexed elements, cumulative product of odd-indexed (capped)
+    transform = (arr: number[]) => {
+      const result: number[] = [];
+      let runSum = 0;
+      let runProd = 1;
+      for (let i = 0; i < arr.length; i++) {
+        if (i % 2 === 0) {
+          runSum += arr[i];
+          result.push(runSum);
+        } else {
+          runProd = (runProd * Math.abs(arr[i])) % 1000;
+          result.push(runProd);
+        }
+      }
+      return result;
+    };
+    description = "Infer the transformation rule from examples.";
   } else {
-    // Absolute value, remove duplicates, sort ascending
-    description =
-      "Given an array of integers, take the absolute value of each, remove duplicates, and return the result sorted in ascending order.";
-    transform = (arr: number[]) =>
-      [...new Set(arr.map((n) => Math.abs(n)))].sort((a, b) => a - b);
+    // Pairwise absolute differences, then map each to parity-signed value and sort by |value| desc.
+    transform = (arr: number[]) => {
+      if (arr.length < 2) return arr;
+      const mapped: number[] = [];
+      for (let i = 0; i < arr.length - 1; i++) {
+        const diff = Math.abs(arr[i + 1] - arr[i]);
+        const signed = diff % 2 === 0 ? diff : -diff;
+        mapped.push(signed + (i % 3));
+      }
+      return [...new Set(mapped)].sort((a, b) => Math.abs(b) - Math.abs(a) || b - a);
+    };
+    description = "Infer the transformation rule from examples.";
   }
 
-  // Generate examples
   const makeArray = (len: number) =>
-    Array.from({ length: len }, () => randInt(-20, 30));
+    Array.from({ length: len }, () => randInt(-15, 25));
 
   const examples: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 3; i++) {
-    const arr = makeArray(randInt(4, 7));
+  for (let i = 0; i < 6; i++) {
+    const arr = makeArray(randInt(5, 9));
     examples.push({ input: arr, output: transform(arr) });
   }
 
-  // Generate 20 test cases
   const tests: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 20; i++) {
-    const arr = makeArray(randInt(3, 12));
+  for (let i = 0; i < 30; i++) {
+    const arr = makeArray(randInt(4, 12));
     tests.push({ input: arr, output: transform(arr) });
   }
 
   return { description, examples, tests };
 }
 
-// ── String Pattern ────────────────────────────────────────────────────
-
-function generateStringPattern(rng: () => number) {
+// Complex string transformation with conditional rules
+function generateConditionalString(rng: () => number) {
   const variant = Math.floor(rng() * 3);
 
   const wordPools = [
-    ["reef", "coral", "tide", "wave", "shell", "crab", "pearl", "anchor", "sail", "storm"],
-    ["arena", "claw", "trident", "gladiator", "shield", "sword", "battle", "victory", "honor", "forge"],
-    ["deep", "dark", "blue", "swift", "bright", "sharp", "cold", "wild", "fierce", "bold"],
+    ["reef", "coral", "tide", "wave", "shell", "crab", "pearl", "anchor", "sail", "storm",
+     "kelp", "trident", "abyss", "current", "shoal", "barnacle"],
+    ["arena", "claw", "gladiator", "shield", "sword", "battle", "victory", "honor", "forge",
+     "champion", "titan", "serpent", "dragon", "valor", "fury", "ember"],
   ];
   const pool = wordPools[Math.floor(rng() * wordPools.length)];
   const pick = () => pool[Math.floor(rng() * pool.length)];
 
-  let description: string;
   let transform: (s: string) => string;
 
   if (variant === 0) {
-    // Reverse each word, keep order
-    description =
-      "Given a sentence (space-separated words), reverse each individual word but keep the word order unchanged. Return the result as a single string.";
-    transform = (s: string) =>
-      s.split(" ").map((w) => w.split("").reverse().join("")).join(" ");
+    // Words with even length: reverse. Words with odd length: uppercase. Then sort all words alphabetically.
+    transform = (s: string) => {
+      const words = s.split(" ");
+      const transformed = words.map(w =>
+        w.length % 2 === 0 ? w.split("").reverse().join("") : w.toUpperCase()
+      );
+      return transformed.sort().join(" ");
+    };
   } else if (variant === 1) {
-    // Capitalize alternating characters (0-indexed: even=upper, odd=lower)
-    description =
-      "Given a string, capitalize characters at even indices (0-based) and lowercase characters at odd indices. Spaces count as characters for indexing purposes.";
-    transform = (s: string) =>
-      s.split("").map((ch, i) => (i % 2 === 0 ? ch.toUpperCase() : ch.toLowerCase())).join("");
+    // For each word: if it starts with a vowel, prepend "the-". If consonant, append its length.
+    // Then reverse the entire word order.
+    transform = (s: string) => {
+      const vowels = "aeiouAEIOU";
+      const words = s.split(" ");
+      const transformed = words.map(w =>
+        vowels.includes(w[0]) ? `the-${w}` : `${w}${w.length}`
+      );
+      return transformed.reverse().join(" ");
+    };
   } else {
-    // Remove vowels
-    description =
-      "Given a string, remove all vowels (a, e, i, o, u — both uppercase and lowercase) and return the remaining characters.";
-    transform = (s: string) => s.replace(/[aeiouAEIOU]/g, "");
+    // Caesar shift each character by position in word (0-indexed).
+    // Non-alpha chars pass through. Then lowercase everything.
+    transform = (s: string) => {
+      const words = s.split(" ");
+      const shifted = words.map(w => {
+        let result = "";
+        for (let i = 0; i < w.length; i++) {
+          const c = w.charCodeAt(i);
+          if (c >= 97 && c <= 122) {
+            result += String.fromCharCode(((c - 97 + i) % 26) + 97);
+          } else if (c >= 65 && c <= 90) {
+            result += String.fromCharCode(((c - 65 + i) % 26) + 97);
+          } else {
+            result += w[i];
+          }
+        }
+        return result;
+      });
+      return shifted.join(" ");
+    };
   }
 
   const makeSentence = (wordCount: number) =>
     Array.from({ length: wordCount }, () => pick()).join(" ");
 
   const examples: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 3; i++) {
-    const sentence = makeSentence(Math.floor(rng() * 3) + 2);
+  for (let i = 0; i < 6; i++) {
+    const sentence = makeSentence(Math.floor(rng() * 3) + 3);
     examples.push({ input: sentence, output: transform(sentence) });
   }
 
   const tests: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 20; i++) {
-    const sentence = makeSentence(Math.floor(rng() * 4) + 2);
+  for (let i = 0; i < 30; i++) {
+    const sentence = makeSentence(Math.floor(rng() * 4) + 3);
     tests.push({ input: sentence, output: transform(sentence) });
   }
 
-  return { description, examples, tests };
+  return { description: "Infer the transformation rule from examples.", examples, tests };
 }
 
-// ── Number Sequence ───────────────────────────────────────────────────
-
-function generateNumberSequence(rng: () => number) {
+// Object/record transformation with multi-step pipeline
+function generateRecordTransform(rng: () => number) {
   const randInt = (min: number, max: number) => Math.floor(rng() * (max - min + 1)) + min;
   const variant = Math.floor(rng() * 3);
 
-  let description: string;
-  let generateSequence: (startSeed: number) => { given: number[]; answer: number[] };
+  type Record_ = { name: string; values: number[]; tags: string[] };
+
+  const names = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"];
+  const tagPool = ["hot", "cold", "fast", "slow", "big", "small", "new", "old"];
+  const threshold = randInt(15, 30);
+
+  let transform: (rec: Record_) => unknown;
 
   if (variant === 0) {
-    // Arithmetic sequence: a, a+d, a+2d, ...
-    const d = randInt(2, 7);
-    description = `Given the first few numbers of an arithmetic sequence with common difference ${d}, predict the next 3 numbers.`;
-    generateSequence = (startSeed: number) => {
-      const a = startSeed;
-      const given = Array.from({ length: 5 }, (_, i) => a + i * d);
-      const answer = Array.from({ length: 3 }, (_, i) => a + (5 + i) * d);
-      return { given, answer };
+    // Filter values > threshold, compute mean of remaining. If mean > threshold * 2, tag as "critical".
+    // Return {name, filtered_mean, tag_count, status}
+    transform = (rec: Record_) => {
+      const filtered = rec.values.filter(v => v > threshold);
+      const mean = filtered.length > 0 ? filtered.reduce((a, b) => a + b, 0) / filtered.length : 0;
+      return {
+        name: rec.name,
+        filtered_mean: Math.round(mean * 100) / 100,
+        tag_count: rec.tags.length,
+        status: mean > threshold * 2 ? "critical" : "normal",
+      };
     };
   } else if (variant === 1) {
-    // Geometric sequence: a, a*r, a*r^2, ...
-    const r = randInt(2, 4);
-    description = `Given the first few numbers of a geometric sequence with common ratio ${r}, predict the next 3 numbers.`;
-    generateSequence = (startSeed: number) => {
-      const a = Math.max(1, startSeed % 5 + 1);
-      const given = Array.from({ length: 5 }, (_, i) => a * Math.pow(r, i));
-      const answer = Array.from({ length: 3 }, (_, i) => a * Math.pow(r, 5 + i));
-      return { given, answer };
+    // Sort values descending, take top 3 (or fewer). Combine tags into single string sorted alphabetically.
+    // Return {name, top_values, combined_tags, total}
+    transform = (rec: Record_) => {
+      const sorted = [...rec.values].sort((a, b) => b - a);
+      const top = sorted.slice(0, 3);
+      const combinedTags = [...rec.tags].sort().join(",");
+      return {
+        name: rec.name,
+        top_values: top,
+        combined_tags: combinedTags,
+        total: top.reduce((a, b) => a + b, 0),
+      };
     };
   } else {
-    // Fibonacci-like: each number is sum of previous two
-    description =
-      "Given the first few numbers of a Fibonacci-like sequence (each number is the sum of the two preceding numbers), predict the next 3 numbers.";
-    generateSequence = (startSeed: number) => {
-      const a = (startSeed % 5) + 1;
-      const b = ((startSeed * 3) % 7) + 2;
-      const seq = [a, b];
-      for (let i = 2; i < 8; i++) {
-        seq.push(seq[i - 1] + seq[i - 2]);
+    // Compute running max of values. Count values that set a new max. Tags with length > 3 get uppercased.
+    // Return {name, running_max, new_max_count, processed_tags}
+    transform = (rec: Record_) => {
+      let max = -Infinity;
+      let newMaxCount = 0;
+      const runningMax: number[] = [];
+      for (const v of rec.values) {
+        if (v > max) { max = v; newMaxCount++; }
+        runningMax.push(max);
       }
-      return { given: seq.slice(0, 5), answer: seq.slice(5, 8) };
+      const processedTags = rec.tags.map(t => t.length > 3 ? t.toUpperCase() : t);
+      return {
+        name: rec.name,
+        running_max: runningMax,
+        new_max_count: newMaxCount,
+        processed_tags: processedTags,
+      };
     };
   }
 
+  const makeRecord = (): Record_ => ({
+    name: names[Math.floor(rng() * names.length)],
+    values: Array.from({ length: randInt(4, 8) }, () => randInt(5, 60)),
+    tags: Array.from({ length: randInt(1, 4) }, () => tagPool[Math.floor(rng() * tagPool.length)]),
+  });
+
   const examples: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 3; i++) {
-    const seed = randInt(1, 20);
-    const { given, answer } = generateSequence(seed);
-    examples.push({ input: given, output: answer });
+  for (let i = 0; i < 6; i++) {
+    const rec = makeRecord();
+    examples.push({ input: rec, output: transform(rec) });
   }
 
   const tests: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 20; i++) {
-    const seed = randInt(1, 50);
-    const { given, answer } = generateSequence(seed);
-    tests.push({ input: given, output: answer });
+  for (let i = 0; i < 30; i++) {
+    const rec = makeRecord();
+    tests.push({ input: rec, output: transform(rec) });
   }
 
-  return { description, examples, tests };
+  return { description: "Infer the transformation rule from examples.", examples, tests };
 }
 
-// ── Run-Length Codec ──────────────────────────────────────────────────
-
-function generateRunLengthCodec(rng: () => number) {
+// Matrix/grid transformation
+function generateGridTransform(rng: () => number) {
+  const randInt = (min: number, max: number) => Math.floor(rng() * (max - min + 1)) + min;
   const variant = Math.floor(rng() * 2);
 
-  let description: string;
-  let transform: (s: string) => string;
+  let transform: (grid: number[][]) => unknown;
 
   if (variant === 0) {
-    // Encode: "aaabbc" -> "a3b2c1"
-    description =
-      'Given a string, return its run-length encoded version. Each run of consecutive identical characters is replaced by the character followed by its count. Example: "aaabbc" becomes "a3b2c1".';
-    transform = (s: string) => {
-      if (s.length === 0) return "";
-      let result = "";
-      let current = s[0];
-      let count = 1;
-      for (let i = 1; i < s.length; i++) {
-        if (s[i] === current) {
-          count++;
-        } else {
-          result += current + String(count);
-          current = s[i];
-          count = 1;
+    // Rotate 90 degrees clockwise, then replace each cell with the sum of its von Neumann neighbors
+    transform = (grid: number[][]) => {
+      const rows = grid.length;
+      const cols = grid[0]?.length ?? 0;
+      // Rotate 90 CW: new[j][rows-1-i] = old[i][j]
+      const rotated: number[][] = Array.from({ length: cols }, () => Array(rows).fill(0));
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          rotated[j][rows - 1 - i] = grid[i][j];
         }
       }
-      result += current + String(count);
+      const rr = rotated.length;
+      const rc = rotated[0]?.length ?? 0;
+      const result: number[][] = Array.from({ length: rr }, () => Array(rc).fill(0));
+      for (let i = 0; i < rr; i++) {
+        for (let j = 0; j < rc; j++) {
+          let sum = 0;
+          if (i > 0) sum += rotated[i - 1][j];
+          if (i < rr - 1) sum += rotated[i + 1][j];
+          if (j > 0) sum += rotated[i][j - 1];
+          if (j < rc - 1) sum += rotated[i][j + 1];
+          result[i][j] = sum;
+        }
+      }
       return result;
     };
   } else {
-    // Decode: "a3b2c1" -> "aaabbc"
-    description =
-      'Given a run-length encoded string (character followed by its count), decode it back to the original string. Example: "a3b2c1" becomes "aaabbc".';
-    transform = (s: string) => {
-      let result = "";
-      for (let i = 0; i < s.length; i += 2) {
-        const ch = s[i];
-        const count = parseInt(s[i + 1], 10);
-        result += ch.repeat(count);
-      }
-      return result;
+    // Transpose, then for each row: replace values with their rank within that row (1-indexed, ties get same rank)
+    transform = (grid: number[][]) => {
+      const rows = grid.length;
+      const cols = grid[0]?.length ?? 0;
+      // Transpose
+      const transposed: number[][] = Array.from({ length: cols }, (_, j) =>
+        Array.from({ length: rows }, (_, i) => grid[i][j])
+      );
+      // Rank within each row
+      return transposed.map(row => {
+        const sorted = [...row].sort((a, b) => a - b);
+        return row.map(v => sorted.indexOf(v) + 1);
+      });
     };
   }
 
-  const letters = "abcdefghijklmnopqrstuvwxyz";
-
-  const makeString = (variant: number): string => {
-    if (variant === 0) {
-      // For encoding: generate a string with runs
-      let s = "";
-      const segments = Math.floor(rng() * 4) + 2;
-      for (let i = 0; i < segments; i++) {
-        const ch = letters[Math.floor(rng() * 10)];
-        const runLen = Math.floor(rng() * 4) + 1;
-        s += ch.repeat(runLen);
-      }
-      return s;
-    } else {
-      // For decoding: generate a valid encoded string
-      let s = "";
-      const segments = Math.floor(rng() * 4) + 2;
-      for (let i = 0; i < segments; i++) {
-        const ch = letters[Math.floor(rng() * 10)];
-        const count = Math.floor(rng() * 4) + 1;
-        s += ch + String(count);
-      }
-      return s;
-    }
-  };
+  const makeGrid = (r: number, c: number) =>
+    Array.from({ length: r }, () =>
+      Array.from({ length: c }, () => randInt(1, 20))
+    );
 
   const examples: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 3; i++) {
-    const input = makeString(variant);
-    examples.push({ input, output: transform(input) });
+  for (let i = 0; i < 6; i++) {
+    const r = randInt(3, 4);
+    const c = randInt(3, 4);
+    const grid = makeGrid(r, c);
+    examples.push({ input: grid, output: transform(grid) });
   }
 
   const tests: Array<{ input: unknown; output: unknown }> = [];
-  for (let i = 0; i < 20; i++) {
-    const input = makeString(variant);
-    tests.push({ input, output: transform(input) });
+  for (let i = 0; i < 30; i++) {
+    const r = randInt(3, 5);
+    const c = randInt(3, 5);
+    const grid = makeGrid(r, c);
+    tests.push({ input: grid, output: transform(grid) });
   }
 
-  return { description, examples, tests };
+  return { description: "Infer the transformation rule from examples.", examples, tests };
 }
 
-// ── Task registry ─────────────────────────────────────────────────────
-
 const TASK_GENERATORS: TaskGenerator[] = [
-  { type: "array_transform", generate: generateArrayTransform },
-  { type: "string_pattern", generate: generateStringPattern },
-  { type: "number_sequence", generate: generateNumberSequence },
-  { type: "run_length_codec", generate: generateRunLengthCodec },
+  { type: "positional_transform", generate: generatePositionalTransform },
+  { type: "conditional_string", generate: generateConditionalString },
+  { type: "record_pipeline", generate: generateRecordTransform },
+  { type: "grid_transform", generate: generateGridTransform },
 ];
-
-// ── Main generator ────────────────────────────────────────────────────
 
 export function generateDepthFirstData(seed: number): DepthFirstData {
   const rng = mulberry32(seed);
 
-  // Pick one task type deterministically from seed
   const taskGen = TASK_GENERATORS[Math.floor(rng() * TASK_GENERATORS.length)];
   const { description, examples, tests } = taskGen.generate(rng);
 
@@ -322,9 +369,11 @@ export function generateDepthFirstData(seed: number): DepthFirstData {
   };
 
   const objective =
-    "You are given a code specification describing a transformation, along with 3 worked examples. " +
-    "Figure out the transformation rule and apply it to 20 test inputs. " +
-    "Submit your answers as a JSON object mapping each test ID to its output — " +
+    "You are given 6 worked examples of an input-output transformation. The rule is NOT described — " +
+    "you must infer it from the examples alone. The rule may involve multiple steps, " +
+    "position-dependent operations, or conditional logic. " +
+    "Apply the inferred rule to 30 test inputs. " +
+    `Submit your answers as a JSON object mapping each test ID to its output — ` +
     `e.g. { "${test_inputs[0].id}": <output>, "${test_inputs[1].id}": <output>, ... }.`;
 
   return { spec, test_inputs, groundTruth, objective };

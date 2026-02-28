@@ -17,6 +17,7 @@ export function scoreHaystack(input: ScoringInput): ScoreResult {
   // ── Accuracy (0-1000) ──────────────────────────────────────────
   let correctCount = 0;
   let partialCredit = 0;
+  const exactByQuestion = new Map<number, boolean>();
 
   for (const truthAnswer of truth.answers) {
     const submitted = submittedAnswers.find(a => a.question_id === truthAnswer.question_id);
@@ -27,7 +28,9 @@ export function scoreHaystack(input: ScoringInput): ScoreResult {
 
     if (normSubmitted === normTruth) {
       correctCount++;
+      exactByQuestion.set(truthAnswer.question_id, true);
     } else {
+      exactByQuestion.set(truthAnswer.question_id, false);
       // Partial credit: check if the answer contains key parts
       const truthParts = normTruth.split(/[,;]/).map(p => p.trim()).filter(Boolean);
       const matchedParts = truthParts.filter(part => normSubmitted.includes(part));
@@ -38,7 +41,7 @@ export function scoreHaystack(input: ScoringInput): ScoreResult {
   }
 
   const totalQuestions = truth.answers.length;
-  raw.accuracy = Math.round(((correctCount + partialCredit * 0.5) / totalQuestions) * 1000);
+  raw.accuracy = Math.round(((correctCount + partialCredit * 0.25) / totalQuestions) * 1000);
 
   // ── Citation Quality (0-1000) ──────────────────────────────────
   let citationScore = 0;
@@ -47,6 +50,7 @@ export function scoreHaystack(input: ScoringInput): ScoreResult {
   for (const truthAnswer of truth.answers) {
     const submitted = submittedAnswers.find(a => a.question_id === truthAnswer.question_id);
     if (!submitted?.sources || submitted.sources.length === 0) continue;
+    if (!exactByQuestion.get(truthAnswer.question_id)) continue;
     citationsGiven++;
 
     const truthSources = truthAnswer.source_files.map(s => s.toLowerCase());
@@ -71,9 +75,14 @@ export function scoreHaystack(input: ScoringInput): ScoreResult {
   raw.speed = Math.max(0, Math.round(1000 * (1 - elapsed / timeLimit)));
 
   // ── Completeness (0-1000) ──────────────────────────────────────
-  const answeredCount = submittedAnswers.filter(a =>
-    a.answer && String(a.answer).trim().length > 0
-  ).length;
+  const validQuestionIds = new Set(truth.answers.map(a => a.question_id));
+  const answeredIds = new Set<number>();
+  for (const a of submittedAnswers) {
+    if (!validQuestionIds.has(a.question_id)) continue;
+    if (!a.answer || String(a.answer).trim().length === 0) continue;
+    answeredIds.add(a.question_id);
+  }
+  const answeredCount = answeredIds.size;
   raw.completeness = Math.round((answeredCount / totalQuestions) * 1000);
 
   const breakdown = computeWeightedTotal(raw, NEEDLE_HAYSTACK_DIMENSIONS);

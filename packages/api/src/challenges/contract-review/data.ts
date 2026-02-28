@@ -361,102 +361,149 @@ const issuePlanters: IssuePlanter[] = [
   {
     type: "inconsistency",
     plant: (sections, _definitions, rng, issueIdx, seed) => {
-      // Pick two sections and make the same term mean different things
-      const termPairs = [
-        { term: "Effective Date", defA: "the date of last signature", defB: "the date of first payment" },
-        { term: "business days", defA: "Monday through Friday, excluding public holidays", defB: "any day on which commercial operations are conducted, including weekends" },
-        { term: "material breach", defA: "a breach that substantially deprives the other party of the benefit of this Agreement", defB: "any failure to perform a contractual obligation within the specified timeframe" },
+      // Modify existing clauses to create conflicting numeric values
+      const numericConflicts = [
+        { pattern: /thirty \(30\) calendar days/g, replacement: "forty-five (45) business days", desc: "notice/payment period" },
+        { pattern: /fifteen \(15\) business days/g, replacement: "ten (10) calendar days", desc: "inspection period" },
+        { pattern: /twelve \(12\) months/g, replacement: "eighteen (18) months", desc: "warranty/monitoring period" },
+        { pattern: /sixty \(60\) days/g, replacement: "forty-five (45) days", desc: "termination/renewal notice period" },
+        { pattern: /ninety \(90\) days/g, replacement: "one hundred twenty (120) days", desc: "force majeure/mediation period" },
+        { pattern: /five \(5\) years/g, replacement: "three (3) years", desc: "confidentiality survival period" },
       ];
-      const pair = termPairs[Math.floor(rng() * termPairs.length)];
-      const validSections = sections.filter(s => s.clauses.length >= 2);
-      if (validSections.length < 2) return null;
 
-      const idxA = Math.floor(rng() * validSections.length);
-      let idxB = Math.floor(rng() * validSections.length);
-      if (idxB === idxA) idxB = (idxA + 1) % validSections.length;
-      const secA = validSections[idxA];
-      const secB = validSections[idxB];
+      const conflict = numericConflicts[Math.floor(rng() * numericConflicts.length)];
+      const candidateSections = sections.filter(s => {
+        return s.clauses.some(c => conflict.pattern.test(c));
+      });
+      // Reset regex lastIndex
+      conflict.pattern.lastIndex = 0;
 
-      const clauseIdxA = Math.floor(rng() * secA.clauses.length);
-      secA.clauses[clauseIdxA] += ` For purposes of this section, "${pair.term}" shall mean ${pair.defA}.`;
+      if (candidateSections.length === 0) return null;
+      const sec = candidateSections[Math.floor(rng() * candidateSections.length)];
 
-      const clauseIdxB = Math.floor(rng() * secB.clauses.length);
-      secB.clauses[clauseIdxB] += ` For purposes of this section, "${pair.term}" shall mean ${pair.defB}.`;
-
-      return {
-        id: `issue-${seed}-${issueIdx}`,
-        type: "inconsistency",
-        section_ids: [secA.id, secB.id],
-        description: `The term "${pair.term}" is defined inconsistently: "${pair.defA}" in ${secA.title} vs "${pair.defB}" in ${secB.title}.`,
-        severity: "high",
-      };
+      // Find and modify the first matching clause
+      for (let ci = 0; ci < sec.clauses.length; ci++) {
+        conflict.pattern.lastIndex = 0;
+        if (conflict.pattern.test(sec.clauses[ci])) {
+          conflict.pattern.lastIndex = 0;
+          const original = sec.clauses[ci].match(conflict.pattern)![0];
+          sec.clauses[ci] = sec.clauses[ci].replace(conflict.pattern, conflict.replacement);
+          return {
+            id: `issue-${seed}-${issueIdx}`,
+            type: "inconsistency",
+            section_ids: [sec.id],
+            description: `${sec.title} changes ${conflict.desc} to "${conflict.replacement}" which conflicts with "${original}" used elsewhere in the Agreement.`,
+            severity: "high",
+          };
+        }
+      }
+      return null;
     },
   },
   {
     type: "undefined_term",
     plant: (sections, definitions, rng, issueIdx, seed) => {
-      const undefinedTerms = [
-        { term: "Qualified Personnel", usage: "All work shall be performed by Qualified Personnel with appropriate certifications." },
-        { term: "Critical Infrastructure", usage: "Provider shall prioritize maintenance of Critical Infrastructure above all other obligations." },
-        { term: "Emergency Protocol", usage: "In the event of system failure, the Emergency Protocol shall be activated immediately." },
-        { term: "Acceptable Deviation", usage: "Minor variations within the Acceptable Deviation range shall not constitute a defect." },
+      // Inject undefined capitalized terms into existing clauses by replacing ordinary words
+      const termInjections = [
+        { term: "Qualified Personnel", inject: (clause: string) => clause.replace("personnel operating", "Qualified Personnel operating").replace("authorized representatives", "Qualified Personnel") },
+        { term: "Critical Infrastructure", inject: (clause: string) => clause.replace("infrastructure modules", "Critical Infrastructure modules").replace("infrastructure deployment", "Critical Infrastructure deployment") },
+        { term: "Remediation Standard", inject: (clause: string) => clause.replace("at its own expense", "in accordance with the Remediation Standard, at its own expense").replace("remedial actions", "remedial actions conforming to the Remediation Standard") },
+        { term: "Priority Classification", inject: (clause: string) => clause.replace("material breach", "material breach of Priority Classification A or higher").replace("milestones achieved", "milestones achieved at the applicable Priority Classification level") },
       ];
-      const selected = undefinedTerms[Math.floor(rng() * undefinedTerms.length)];
+      const selected = termInjections[Math.floor(rng() * termInjections.length)];
       const definedTermNames = definitions.map(d => d.term.toLowerCase());
       if (definedTermNames.includes(selected.term.toLowerCase())) return null;
 
-      const validSections = sections.filter(s => s.title !== "Definitions" && s.clauses.length >= 1);
+      const validSections = sections.filter(s => s.title !== "Definitions" && s.clauses.length >= 2);
       if (validSections.length === 0) return null;
-      const sec = validSections[Math.floor(rng() * validSections.length)];
-      sec.clauses.push(selected.usage);
 
-      return {
-        id: `issue-${seed}-${issueIdx}`,
-        type: "undefined_term",
-        section_ids: [sec.id],
-        description: `The term "${selected.term}" is used in ${sec.title} but is not defined in the Definitions section.`,
-        severity: "medium",
-      };
+      // Try to inject into an existing clause
+      const shuffledSecs = [...validSections];
+      for (let i = shuffledSecs.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [shuffledSecs[i], shuffledSecs[j]] = [shuffledSecs[j], shuffledSecs[i]];
+      }
+
+      for (const sec of shuffledSecs) {
+        for (let ci = 0; ci < sec.clauses.length; ci++) {
+          const modified = selected.inject(sec.clauses[ci]);
+          if (modified !== sec.clauses[ci]) {
+            sec.clauses[ci] = modified;
+            return {
+              id: `issue-${seed}-${issueIdx}`,
+              type: "undefined_term",
+              section_ids: [sec.id],
+              description: `The term "${selected.term}" is used in ${sec.title} but is not defined in the Definitions section or anywhere else in the Agreement.`,
+              severity: "medium",
+            };
+          }
+        }
+      }
+      return null;
     },
   },
   {
     type: "contradiction",
     plant: (sections, _definitions, rng, issueIdx, seed) => {
-      const contradictions = [
+      // Modify existing clauses to create contradictions with other existing clauses
+      const contradictionMods = [
         {
-          clauseA: "Termination for convenience requires ninety (90) days' written notice.",
-          clauseB: "Either party may terminate this Agreement immediately upon thirty (30) days' written notice for any reason.",
-          desc: "Contradictory termination notice periods: 90 days for convenience vs 30 days for any reason.",
+          // Turn a "shall not" into "may" or vice versa
+          sectionTitleA: "Assignment and Transfer",
+          findInA: "Neither party may assign or transfer",
+          replaceInA: "Either party may freely assign or transfer",
+          conflictsWith: "any purported assignment in violation",
+          desc: "Assignment is both freely permitted and restricted: assignment clause says transfers are free but the enforcement clause still voids unauthorized ones.",
         },
         {
-          clauseA: "All disputes shall be resolved exclusively through binding arbitration.",
-          clauseB: "Either party may commence litigation in any court of competent jurisdiction to enforce its rights under this Agreement.",
-          desc: "Contradiction between exclusive arbitration and right to litigate.",
+          sectionTitleA: "Subcontracting",
+          findInA: "with Recipient's prior written approval",
+          replaceInA: "without prior notification to Recipient",
+          conflictsWith: "subcontractors comply with the terms",
+          desc: "Subcontracting clause permits work without notification but still requires subcontractor compliance oversight, which is impossible without notification.",
         },
         {
-          clauseA: "Provider shall not subcontract any portion of the work without prior written approval.",
-          clauseB: "Provider may freely engage subcontractors for non-critical components without prior notification.",
-          desc: "Contradiction regarding subcontracting: requires approval vs freely permitted for non-critical work.",
+          sectionTitleA: "Dispute Resolution",
+          findInA: "binding arbitration under the ACAC Arbitration Rules",
+          replaceInA: "non-binding advisory arbitration under the ACAC Arbitration Rules",
+          conflictsWith: "final and binding on both parties",
+          desc: "Arbitration is described as both non-binding advisory and final/binding within the same dispute resolution framework.",
+        },
+        {
+          sectionTitleA: "Confidentiality",
+          findInA: "five (5) years following termination",
+          replaceInA: "the duration of this Agreement only, expiring upon termination",
+          conflictsWith: "survive termination",
+          desc: "Confidentiality obligations expire at termination but the survival clause in Termination section lists Confidentiality as surviving.",
         },
       ];
-      const selected = contradictions[Math.floor(rng() * contradictions.length)];
-      const validSections = sections.filter(s => s.title !== "Definitions" && s.clauses.length >= 1);
-      if (validSections.length < 2) return null;
+      const selected = contradictionMods[Math.floor(rng() * contradictionMods.length)];
+      const targetSection = sections.find(s => s.title === selected.sectionTitleA);
+      if (!targetSection) return null;
 
-      const idxA = Math.floor(rng() * validSections.length);
-      let idxB = Math.floor(rng() * validSections.length);
-      if (idxB === idxA) idxB = (idxA + 1) % validSections.length;
-      const secA = validSections[idxA];
-      const secB = validSections[idxB];
+      let modified = false;
+      for (let ci = 0; ci < targetSection.clauses.length; ci++) {
+        if (targetSection.clauses[ci].includes(selected.findInA)) {
+          targetSection.clauses[ci] = targetSection.clauses[ci].replace(selected.findInA, selected.replaceInA);
+          modified = true;
+          break;
+        }
+      }
+      if (!modified) return null;
 
-      secA.clauses.push(selected.clauseA);
-      secB.clauses.push(selected.clauseB);
+      // Find the section containing the contradicted statement
+      const contradictedSec = sections.find(s =>
+        s.clauses.some(c => c.toLowerCase().includes(selected.conflictsWith.toLowerCase()))
+      );
+      const sectionIds = contradictedSec && contradictedSec.id !== targetSection.id
+        ? [targetSection.id, contradictedSec.id]
+        : [targetSection.id];
 
       return {
         id: `issue-${seed}-${issueIdx}`,
         type: "contradiction",
-        section_ids: [secA.id, secB.id],
-        description: `${selected.desc} (${secA.title} vs ${secB.title})`,
+        section_ids: sectionIds,
+        description: `${selected.desc} (${targetSection.title}${contradictedSec && contradictedSec.id !== targetSection.id ? ` vs ${contradictedSec.title}` : ""})`,
         severity: "high",
       };
     },
@@ -464,18 +511,44 @@ const issuePlanters: IssuePlanter[] = [
   {
     type: "missing_cross_reference",
     plant: (sections, _definitions, rng, issueIdx, seed) => {
-      const phantomSections = ["Section 35", "Section 42", "Section 38", "Appendix F", "Schedule D"];
-      const phantom = phantomSections[Math.floor(rng() * phantomSections.length)];
-      const validSections = sections.filter(s => s.title !== "Definitions" && s.clauses.length >= 1);
+      // Use plausible-looking references that are close but wrong
+      const totalSections = sections.length;
+      const phantomRefs = [
+        `Section ${totalSections + 1}`,
+        `Section ${totalSections + 2}`,
+        `Appendix D`,
+        `Appendix E`,
+        `Schedule B`,
+      ];
+      const phantom = phantomRefs[Math.floor(rng() * phantomRefs.length)];
+
+      // Inject into an existing clause by modifying a real cross-reference pattern
+      const validSections = sections.filter(s =>
+        s.title !== "Definitions" && s.title !== "Parties and Recitals" && s.clauses.length >= 2
+      );
       if (validSections.length === 0) return null;
+
       const sec = validSections[Math.floor(rng() * validSections.length)];
-      sec.clauses.push(`The procedures specified in ${phantom} shall apply to all remedial actions under this section.`);
+      // Modify the last clause to add a subordinate reference
+      const ci = sec.clauses.length - 1;
+      const injections = [
+        `, subject to the limitations set forth in ${phantom}`,
+        `, as further detailed in ${phantom}`,
+        `, in conjunction with the requirements of ${phantom}`,
+      ];
+      const injection = injections[Math.floor(rng() * injections.length)];
+      // Insert before the final period
+      if (sec.clauses[ci].endsWith(".")) {
+        sec.clauses[ci] = sec.clauses[ci].slice(0, -1) + injection + ".";
+      } else {
+        sec.clauses[ci] += injection + ".";
+      }
 
       return {
         id: `issue-${seed}-${issueIdx}`,
         type: "missing_cross_reference",
         section_ids: [sec.id],
-        description: `${sec.title} references ${phantom}, which does not exist in this Agreement.`,
+        description: `${sec.title} references ${phantom}, which does not exist in this Agreement (contract has ${totalSections} sections and Appendices A-C).`,
         severity: "medium",
       };
     },
@@ -483,37 +556,57 @@ const issuePlanters: IssuePlanter[] = [
   {
     type: "ambiguous_clause",
     plant: (sections, _definitions, rng, issueIdx, seed) => {
-      const ambiguousClauses = [
+      // Modify existing clauses to introduce vagueness by replacing specific terms
+      const vagueReplacements = [
         {
-          text: "Provider shall deliver results in a timely manner consistent with reasonable expectations.",
-          desc: 'The phrase "timely manner consistent with reasonable expectations" is ambiguous and lacks measurable criteria.',
+          find: "within thirty (30) calendar days",
+          replace: "within a reasonable timeframe",
+          desc: '"a reasonable timeframe" replaces a specific 30-day deadline, introducing ambiguity.',
         },
         {
-          text: "Compensation adjustments shall be made as appropriate based on market conditions and other relevant factors.",
-          desc: 'The phrase "as appropriate based on market conditions and other relevant factors" is vague and provides no objective standard.',
+          find: "at its own expense",
+          replace: "with costs allocated in a manner to be mutually determined",
+          desc: '"costs allocated in a manner to be mutually determined" provides no objective standard for expense allocation.',
         },
         {
-          text: "Either party may request modifications to the scope of work, which shall be considered in good faith and implemented where practicable.",
-          desc: 'The terms "considered in good faith" and "where practicable" are subjective and do not establish binding obligations.',
+          find: "commercially reasonable efforts",
+          replace: "best efforts as circumstances permit",
+          desc: '"best efforts as circumstances permit" is a higher and vaguer standard than "commercially reasonable efforts" and lacks objective criteria.',
         },
         {
-          text: "Provider shall allocate sufficient resources to ensure satisfactory progress toward project completion.",
-          desc: 'The terms "sufficient resources" and "satisfactory progress" are undefined and open to interpretation.',
+          find: "in accordance with the specifications",
+          replace: "in a manner generally consistent with the project objectives",
+          desc: '"generally consistent with the project objectives" replaces a reference to specific specifications, creating ambiguity about acceptance criteria.',
+        },
+        {
+          find: "material breach",
+          replace: "significant non-performance",
+          desc: '"significant non-performance" is not a defined legal term and lacks the established meaning of "material breach."',
         },
       ];
-      const selected = ambiguousClauses[Math.floor(rng() * ambiguousClauses.length)];
-      const validSections = sections.filter(s => s.title !== "Definitions" && s.clauses.length >= 1);
-      if (validSections.length === 0) return null;
-      const sec = validSections[Math.floor(rng() * validSections.length)];
-      sec.clauses.push(selected.text);
+      const selected = vagueReplacements[Math.floor(rng() * vagueReplacements.length)];
 
-      return {
-        id: `issue-${seed}-${issueIdx}`,
-        type: "ambiguous_clause",
-        section_ids: [sec.id],
-        description: `In ${sec.title}: ${selected.desc}`,
-        severity: "low",
-      };
+      // Find a section containing the specific phrase
+      const candidateSections = sections.filter(s =>
+        s.title !== "Definitions" && s.clauses.some(c => c.includes(selected.find))
+      );
+
+      if (candidateSections.length === 0) return null;
+      const sec = candidateSections[Math.floor(rng() * candidateSections.length)];
+
+      for (let ci = 0; ci < sec.clauses.length; ci++) {
+        if (sec.clauses[ci].includes(selected.find)) {
+          sec.clauses[ci] = sec.clauses[ci].replace(selected.find, selected.replace);
+          return {
+            id: `issue-${seed}-${issueIdx}`,
+            type: "ambiguous_clause",
+            section_ids: [sec.id],
+            description: `In ${sec.title}: ${selected.desc}`,
+            severity: "low",
+          };
+        }
+      }
+      return null;
     },
   },
 ];

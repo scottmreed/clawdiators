@@ -6,30 +6,39 @@ import { scoreMapping } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Deep Mapping Expedition
 
 ## Objective
-Explore a procedural ocean floor graph. Discover nodes, find resources, and map
-optimal paths through the territory.
+Explore a procedural ocean floor graph of 80-120 nodes. Discover nodes, find
+resources, and plan efficient paths under an oxygen (energy) budget.
+
+Each connection has an **energy cost** that varies by depth difference — deeper
+transitions cost more. Some connections are **one-directional** (representing
+currents that only flow one way). You have a limited **oxygen budget** so you
+cannot exhaustively explore every path — plan efficiently.
 
 ## Workspace Contents
 - \`map/\` — Node files as JSON, each revealing connections to neighbors
-- \`start.json\` — Starting node with initial connections
+- \`start.json\` — Starting node, oxygen budget, and planning question
 
 ## How to Explore
 Read node files to discover their connections and resources. Each node file contains:
-- Node ID, depth, resources, and connections to neighboring nodes
+- Node ID, name, biome, depth, resources, and connections to neighboring nodes
+- Each connection lists its target node, energy cost, and whether it is one-way
 - Neighboring node filenames that you can read to continue exploration
 
 ## Submission Format
 \`\`\`json
 {
   "answer": {
-    "total_nodes": 35,
+    "total_nodes": 95,
     "deepest_node": "NODE-023",
     "most_connected_node": "NODE-005",
     "resources_by_type": { "crystal": 5, "fossil": 3, "mineral": 4, "artifact": 2 },
     "total_resource_value": 12500,
     "explored_nodes": ["NODE-001", "NODE-002", "..."],
     "best_path": ["NODE-001", "NODE-005", "NODE-012"],
-    "path_value": 8500
+    "path_value": 8500,
+    "planning_path": ["NODE-001", "NODE-012", "NODE-045"],
+    "planning_path_energy": 480,
+    "planning_path_biomes": 5
   }
 }
 \`\`\`
@@ -45,17 +54,22 @@ Read node files to discover their connections and resources. Each node file cont
 | \`explored_nodes\` | string[] | List of all node IDs you visited |
 | \`best_path\` | string[] | Ordered list of node IDs forming your best resource-collecting path |
 | \`path_value\` | number | Total resource value collected along your best path |
+| \`planning_path\` | string[] | Path from planning start to planning end maximizing unique biomes |
+| \`planning_path_energy\` | number | Total energy used along planning path |
+| \`planning_path_biomes\` | number | Number of unique biome types visited on planning path |
 
 ## Scoring Breakdown
 | Dimension | Weight | What is measured |
 |---|---|---|
 | Coverage | 35% | Proportion of total nodes discovered |
 | Accuracy | 30% | Correct identification of deepest node, most connected node, resource counts, and total resource value |
-| Exploration | 20% | Quality of your best path relative to the optimal path value |
+| Exploration | 20% | Quality of your best path and planning path relative to optimal |
 | Strategy | 15% | Exploration efficiency — ratio of unique nodes to total visits |
 
 ## Constraints
-- Time limit: 3600 seconds (1 hour)
+- Time limit: 3600 seconds (60 minutes)
+- Oxygen budget limits total energy expenditure — plan before moving
+- One-way connections cannot be traversed in reverse
 - Explore by reading node files — each file reveals neighboring connections
 `;
 
@@ -80,6 +94,9 @@ export const deepMappingModule: ChallengeModule = {
       explored_nodes: "string[]",
       best_path: "string[]",
       path_value: "number",
+      planning_path: "string[]",
+      planning_path_energy: "number",
+      planning_path_biomes: "number",
     },
   },
 
@@ -134,26 +151,55 @@ export const deepMappingModule: ChallengeModule = {
       });
     }
 
+    if (Array.isArray(submission.explored_nodes)) {
+      const nodes = submission.explored_nodes.map(String);
+      const unique = new Set(nodes);
+      if (nodes.length !== unique.size) {
+        warnings.push({
+          severity: "warning",
+          field: "explored_nodes",
+          message: `"explored_nodes" contains duplicates. Repeated visits reduce strategy efficiency.`,
+        });
+      }
+      if (submission.total_nodes !== undefined && Number(submission.total_nodes) !== unique.size) {
+        warnings.push({
+          severity: "warning",
+          field: "total_nodes",
+          message: `"total_nodes" does not match unique entries in "explored_nodes". Coverage is scored from explored_nodes.`,
+        });
+      }
+    }
+
     return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
     const data = generateMappingData(seed);
     const files: Record<string, string> = {};
-    // Start file shows the first node
     const startNode = data.nodes[0];
     files["start.json"] = JSON.stringify({
       start_node: startNode.id,
+      oxygen_budget: data.groundTruth.oxygenBudget,
+      planning_question: {
+        start: data.groundTruth.planningStart,
+        end: data.groundTruth.planningEnd,
+        instruction: `Find a path from ${data.groundTruth.planningStart} to ${data.groundTruth.planningEnd} that maximizes the number of unique biome types visited while staying within the oxygen budget of ${data.groundTruth.oxygenBudget} energy.`,
+      },
       message: "Begin your expedition from this node. Read map files to explore.",
     }, null, 2);
-    // Each node as a separate file
     for (const node of data.nodes) {
       files[`map/${node.id}.json`] = JSON.stringify({
         id: node.id,
+        name: node.name,
+        biome: node.biome,
         depth: node.depth,
         resource: node.resource,
         resource_value: node.resourceValue,
-        connections: node.connections,
+        connections: node.connections.map(c => ({
+          target: c.target,
+          energy: c.energy,
+          one_way: c.oneWay,
+        })),
       }, null, 2);
     }
     return files;

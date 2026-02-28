@@ -67,24 +67,24 @@ export const CIPHER_FORGE_DIMENSIONS: ScoringDimension[] = [
 ];
 
 export const LOGIC_REEF_DIMENSIONS: ScoringDimension[] = [
-  { key: "validity", label: "Validity", weight: 0.4, description: "Correctness of logical conclusions", color: "emerald" },
-  { key: "reasoning_depth", label: "Reasoning Depth", weight: 0.25, description: "Quality and depth of logical reasoning", color: "purple" },
+  { key: "validity", label: "Validity", weight: 0.5, description: "Correctness of logical conclusions", color: "emerald" },
+  { key: "reasoning", label: "Reasoning", weight: 0.2, description: "Include reasoning explaining your logical steps", color: "purple" },
   { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
-  { key: "methodology", label: "Methodology", weight: 0.2, description: "Structured approach to logic puzzles", color: "gold" },
+  { key: "coverage", label: "Coverage", weight: 0.15, description: "Fraction of puzzles attempted", color: "gold" },
 ];
 
 export const REEF_REFACTOR_DIMENSIONS: ScoringDimension[] = [
-  { key: "correctness", label: "Correctness", weight: 0.5, description: "Correct outputs for all test cases", color: "emerald" },
-  { key: "speed", label: "Speed", weight: 0.2, description: "Time to submission relative to limit", color: "sky" },
-  { key: "coverage", label: "Coverage", weight: 0.15, description: "Percentage of functions attempted", color: "purple" },
-  { key: "methodology", label: "Methodology", weight: 0.15, description: "Structured approach to debugging", color: "gold" },
+  { key: "correctness", label: "Correctness", weight: 0.7, description: "Exact correctness across all function test cases", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "coverage", label: "Coverage", weight: 0.05, description: "Fraction of functions attempted with non-empty outputs", color: "purple" },
+  { key: "methodology", label: "Methodology", weight: 0.1, description: "Clear, specific debugging approach", color: "gold" },
 ];
 
 export const DEPTH_FIRST_GEN_DIMENSIONS: ScoringDimension[] = [
-  { key: "correctness", label: "Correctness", weight: 0.5, description: "Correct outputs for hidden test cases", color: "emerald" },
-  { key: "speed", label: "Speed", weight: 0.2, description: "Time to submission relative to limit", color: "sky" },
-  { key: "coverage", label: "Coverage", weight: 0.15, description: "Percentage of test cases attempted", color: "purple" },
-  { key: "methodology", label: "Methodology", weight: 0.15, description: "Structured approach to code reasoning", color: "gold" },
+  { key: "correctness", label: "Correctness", weight: 0.7, description: "Exact correctness across all hidden test outputs", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
+  { key: "coverage", label: "Coverage", weight: 0.05, description: "Percentage of test cases attempted", color: "purple" },
+  { key: "methodology", label: "Methodology", weight: 0.1, description: "Substantive rule-inference explanation", color: "gold" },
 ];
 
 export const ARCHIVE_DIVE_DIMENSIONS: ScoringDimension[] = [
@@ -123,17 +123,17 @@ export const BLUEPRINT_AUDIT_DIMENSIONS: ScoringDimension[] = [
 ];
 
 export const ADVERSARIAL_INTERVIEW_DIMENSIONS: ScoringDimension[] = [
-  { key: "discernment", label: "Discernment", weight: 0.45, description: "Identifying false premises and acknowledging ambiguity", color: "purple" },
+  { key: "discernment", label: "Discernment", weight: 0.55, description: "Correctly classifying false-premise vs ambiguous questions with supporting evidence", color: "purple" },
   { key: "accuracy", label: "Accuracy", weight: 0.25, description: "Correctness of straightforward answers", color: "emerald" },
-  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
-  { key: "methodology", label: "Methodology", weight: 0.15, description: "Structured approach to question assessment", color: "gold" },
+  { key: "speed", label: "Speed", weight: 0.1, description: "Time to submission relative to limit", color: "sky" },
+  { key: "methodology", label: "Methodology", weight: 0.1, description: "Structured approach to question assessment", color: "gold" },
 ];
 
 export const THE_MIRAGE_DIMENSIONS: ScoringDimension[] = [
-  { key: "detection", label: "Detection", weight: 0.4, description: "Identifying fabricated data points across sources", color: "purple" },
-  { key: "precision", label: "Precision", weight: 0.25, description: "Reported fabrications that are actual fabrications", color: "emerald" },
-  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
-  { key: "thoroughness", label: "Thoroughness", weight: 0.2, description: "Depth of cross-referencing across datasets", color: "gold" },
+  { key: "detection", label: "Detection", weight: 0.55, description: "Correctly identifying fabricated district+field pairs", color: "purple" },
+  { key: "precision", label: "Precision", weight: 0.3, description: "Reported fabrications that are actual fabrications", color: "emerald" },
+  { key: "speed", label: "Speed", weight: 0.1, description: "Time to submission relative to limit", color: "sky" },
+  { key: "thoroughness", label: "Thoroughness", weight: 0.05, description: "Coverage of matched findings across all three sources", color: "gold" },
 ];
 
 export const DEEP_MAPPING_DIMENSIONS: ScoringDimension[] = [
@@ -153,10 +153,10 @@ export const CODEBASE_ARCHAEOLOGY_DIMENSIONS: ScoringDimension[] = [
 ];
 
 export const NEEDLE_HAYSTACK_DIMENSIONS: ScoringDimension[] = [
-  { key: "accuracy", label: "Accuracy", weight: 0.45, description: "Correctness of answers against ground truth", color: "emerald" },
-  { key: "citations", label: "Citations", weight: 0.2, description: "Correct identification of source documents", color: "purple" },
-  { key: "speed", label: "Speed", weight: 0.15, description: "Time to submission relative to limit", color: "sky" },
-  { key: "completeness", label: "Completeness", weight: 0.2, description: "Fraction of questions answered", color: "gold" },
+  { key: "accuracy", label: "Accuracy", weight: 0.75, description: "Correctness of answers against ground truth", color: "emerald" },
+  { key: "citations", label: "Citations", weight: 0.1, description: "Correct source identification for correct answers", color: "purple" },
+  { key: "speed", label: "Speed", weight: 0.05, description: "Time to submission relative to limit", color: "sky" },
+  { key: "completeness", label: "Completeness", weight: 0.1, description: "Fraction of unique question IDs answered", color: "gold" },
 ];
 
 export const PERFORMANCE_OPTIMIZER_DIMENSIONS: ScoringDimension[] = [

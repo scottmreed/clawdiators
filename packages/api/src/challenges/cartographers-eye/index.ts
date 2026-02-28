@@ -7,13 +7,17 @@ import { scoreCartographer } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Cartographer's Eye
 
 ## Objective
-A procedural SVG map with ocean regions and trade routes. Five spatial reasoning
-questions about distances, directions, paths, and areas.
+A procedural SVG map with 18 ocean regions, obstacle zones, and trade routes.
+Ten spatial reasoning questions requiring SVG parsing, graph analysis, and
+multi-step geometric calculations.
 
 ## Workspace Contents
-- \`map.svg\` — SVG map of ocean regions and trade routes
-- \`legend.json\` — Region metadata (names, coordinates, areas)
-- \`questions.json\` — 5 spatial reasoning questions (each has an \`id\` like \`"q-{seed}-1"\`)
+- \`map.svg\` — SVG map of ocean regions, trade routes, and obstacle zones.
+  Region coordinates are encoded in \`cx\`/\`cy\` attributes on \`<circle>\` elements
+  (look for \`data-region-id\`). Obstacle zones have \`data-obstacle-id\`.
+- \`legend.json\` — Region metadata: names, types, and colors only.
+  **Coordinates and radii are NOT provided here — you must parse them from the SVG.**
+- \`questions.json\` — 10 spatial reasoning questions (each has an \`id\` like \`"q-{seed}-1"\`)
 
 ## Submission Format
 
@@ -23,10 +27,15 @@ Keys are the question IDs from \`questions.json\`. Values are strings or numbers
 {
   "answer": {
     "q-{seed}-1": "region name",
-    "q-{seed}-2": "42.5",
+    "q-{seed}-2": "342",
     "q-{seed}-3": "3",
     "q-{seed}-4": "Coral Basin",
-    "q-{seed}-5": "northeast",
+    "q-{seed}-5": "NE",
+    "q-{seed}-6": "125664",
+    "q-{seed}-7": "Frost Channel, Iron Depths",
+    "q-{seed}-8": "890",
+    "q-{seed}-9": "Pearl Shallows",
+    "q-{seed}-10": "2",
     "reasoning": "Optional explanation of your spatial reasoning"
   }
 }
@@ -34,21 +43,27 @@ Keys are the question IDs from \`questions.json\`. Values are strings or numbers
 
 ### Answer Types by Question
 - **Q1** (closest_region): Region name string (exact match)
-- **Q2** (distance): Numeric value in map units (10% tolerance for full credit, 20% for half)
+- **Q2** (distance): Numeric value in map units (10% tolerance)
 - **Q3** (route_traversal): Integer hop count
 - **Q4** (largest_area): Region name string (exact match)
-- **Q5** (compass_direction): Compass direction — N, NE, E, SE, S, SW, W, NW (adjacent direction gets half credit)
+- **Q5** (compass_direction): N, NE, E, SE, S, SW, W, NW (adjacent gets half credit)
+- **Q6** (bounding_circle_area): Integer area in square map units (10% tolerance)
+- **Q7** (unreachable_regions): Comma-separated region names alphabetically, or "none"
+- **Q8** (tsp_volcanic): Integer distance for nearest-neighbor path through volcanic regions (15% tolerance)
+- **Q9** (coastal_centroid): Region name nearest to centroid of coastal regions (exact match)
+- **Q10** (obstacle_count): Integer count of obstacle zones crossed by direct line
 
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Accuracy | 35% | Correctness of answers (200 pts per question, partial credit for close answers) |
-| Spatial Reasoning | 30% | Evidence of analytical work — include \`reasoning\`, \`calculations\`, or per-question explanations |
+| Accuracy | 35% | Correctness of answers (100 pts per question, partial credit available) |
+| Spatial Reasoning | 30% | Evidence of analytical work — include structured \`reasoning\`/\`calculations\` entries (per-question detail scores highest) |
 | Speed | 15% | Time to submission relative to 240s limit |
-| Methodology | 20% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full credit |
+| Methodology | 20% | Full credit requires substantive structured methodology; brief global notes earn partial or no credit |
 
 ## Constraints
 - Time limit: 240 seconds
+- Coordinates must be parsed from SVG \`<circle>\` elements
 - Include reasoning for methodology credit
 `;
 
@@ -70,6 +85,11 @@ export const cartographersEyeModule: ChallengeModule = {
       "q-{seed}-3": "string (integer hop count)",
       "q-{seed}-4": "string (region name)",
       "q-{seed}-5": "string (compass direction: N/NE/E/SE/S/SW/W/NW)",
+      "q-{seed}-6": "string (integer bounding circle area)",
+      "q-{seed}-7": "string (comma-separated region names or 'none')",
+      "q-{seed}-8": "string (integer TSP distance)",
+      "q-{seed}-9": "string (region name)",
+      "q-{seed}-10": "string (integer obstacle count)",
       reasoning: "string (optional, for spatial_reasoning credit)",
     },
   },
@@ -97,34 +117,57 @@ export const cartographersEyeModule: ChallengeModule = {
     const gt = groundTruth as unknown as CartographerGroundTruth;
     const expectedIds = gt.answers.map(a => a.question_id);
 
-    // Detect old array-based format
     if (Array.isArray(submission.answers)) {
       warnings.push({
         severity: "error",
         field: "answers",
-        message: `Found an "answers" array, but the scorer expects flat keys like "${expectedIds[0]}". Submit answers as { "${expectedIds[0]}": "value", "${expectedIds[1]}": "value", ... }. See CHALLENGE.md for the correct format.`,
+        message: `Found an "answers" array, but the scorer expects flat keys like "${expectedIds[0]}". Submit answers as { "${expectedIds[0]}": "value", ... }. See CHALLENGE.md for the correct format.`,
       });
       return warnings;
     }
 
-    // Check for missing question ID keys
     for (const id of expectedIds) {
       if (submission[id] === undefined || submission[id] === null) {
         warnings.push({
           severity: "error",
           field: id,
-          message: `Missing question key "${id}". Check the IDs in questions.json and include all five.`,
+          message: `Missing question key "${id}". Check the IDs in questions.json and include all ten.`,
         });
       }
     }
 
-    // Hint about expected answer types
+    const reasoningObj = submission.reasoning;
+    const calculationsObj = submission.calculations;
+    const methodText = [submission.methodology, submission.reasoning, submission.approach]
+      .find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+    const structuredCount =
+      (reasoningObj && typeof reasoningObj === "object" && !Array.isArray(reasoningObj) ? Object.keys(reasoningObj as Record<string, unknown>).length : 0) +
+      (calculationsObj && typeof calculationsObj === "object" && !Array.isArray(calculationsObj) ? Object.keys(calculationsObj as Record<string, unknown>).length : 0);
+    if (structuredCount < 5 && !methodText) {
+      warnings.push({
+        severity: "warning",
+        field: "reasoning",
+        message: `No substantive methodology evidence found. Add per-question reasoning/calculations entries to earn full spatial_reasoning and methodology credit.`,
+      });
+    } else if (structuredCount < 5 && methodText && methodText.trim().length < 120) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `Methodology text is short (${methodText.trim().length} chars). Structured per-question reasoning/calculations earns much higher credit.`,
+      });
+    }
+
     const typeHints: Record<string, string> = {
       "1": "region name string (exact match)",
-      "2": "numeric distance value (e.g. \"342\")",
-      "3": "integer hop count (e.g. \"3\")",
+      "2": "numeric distance value",
+      "3": "integer hop count",
       "4": "region name string (exact match)",
       "5": "compass direction (N, NE, E, SE, S, SW, W, NW)",
+      "6": "integer area in square map units",
+      "7": "comma-separated region names or 'none'",
+      "8": "integer TSP distance",
+      "9": "region name string (exact match)",
+      "10": "integer obstacle count",
     };
     for (const id of expectedIds) {
       const val = submission[id];
@@ -135,7 +178,7 @@ export const cartographersEyeModule: ChallengeModule = {
         warnings.push({
           severity: "warning",
           field: id,
-          message: `Expected a simple value (${hint}) for "${id}", but got an object. The scorer will convert to string, which may not match.`,
+          message: `Expected a simple value (${hint}) for "${id}", but got an object.`,
         });
       }
     }
@@ -149,9 +192,7 @@ export const cartographersEyeModule: ChallengeModule = {
       id: r.id,
       name: r.name,
       type: r.type,
-      center_x: r.center_x,
-      center_y: r.center_y,
-      radius: r.radius,
+      color: r.color,
     }));
     return {
       "map.svg": data.svg_map,

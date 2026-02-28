@@ -6,8 +6,11 @@ import { scoreMirage } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Mirage
 
 ## Objective
-Three datasets for 15 districts — census, financial, and environmental. Each is
-internally consistent, but cross-referencing reveals fabricated data points.
+Three datasets for 15 districts — census, financial, and environmental. Every
+individual value appears plausible in isolation. However, cross-referencing values
+across fields and datasets reveals fabricated data points. You must compare
+related fields (e.g., tax revenue vs. population and income, CO2 per capita
+across districts, land use percentages) to identify the anomalies.
 
 ## Workspace Contents
 - \`census/\` — Census data files per district
@@ -30,13 +33,15 @@ internally consistent, but cross-referencing reveals fabricated data points.
 }
 \`\`\`
 
+Valid \`source\` values are: \`census\`, \`financial\`, \`environmental\`.
+
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Detection | 40% | Of the ground-truth fabrications, how many did you find? Matched by district + field or district + source. |
-| Precision | 25% | Of your submitted fabrications, how many are real? Avoid false positives. |
-| Speed | 15% | Faster submissions score higher (linear decay over the 240s time limit). |
-| Thoroughness | 20% | Did you check all three data sources? Full marks for referencing census, financial, and environmental. |
+| Detection | 55% | Of the ground-truth fabrications, how many did you find? Matched strictly by district + field (source must agree if provided). |
+| Precision | 30% | Of your submitted fabrications, how many are real? Avoid false positives. |
+| Speed | 10% | Faster submissions score higher (linear decay over the 240s time limit). |
+| Thoroughness | 5% | Are your correctly matched findings distributed across census, financial, and environmental sources? |
 
 ## Constraints
 - Time limit: 240 seconds
@@ -80,6 +85,7 @@ export const theMirageModule: ChallengeModule = {
 
   validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
     const warnings: SubmissionWarning[] = [];
+    const validSources = new Set(["census", "financial", "environmental"]);
 
     if (!Array.isArray(submission.fabrications)) {
       warnings.push({
@@ -111,6 +117,19 @@ export const theMirageModule: ChallengeModule = {
           severity: "warning",
           field: `fabrications[${i}].source`,
           message: `Fabrication at index ${i} is missing "source". Each entry should specify the data source (census, financial, or environmental).`,
+        });
+      } else if (typeof entry.source === "string" && !validSources.has(entry.source.toLowerCase().trim())) {
+        warnings.push({
+          severity: "warning",
+          field: `fabrications[${i}].source`,
+          message: `Fabrication at index ${i} has unknown source "${entry.source}". Valid values are census, financial, environmental.`,
+        });
+      }
+      if (!entry.explanation || String(entry.explanation).trim().length < 30) {
+        warnings.push({
+          severity: "warning",
+          field: `fabrications[${i}].explanation`,
+          message: `Fabrication at index ${i} has a very short explanation. Include concrete cross-reference rationale for higher confidence scoring.`,
         });
       }
     }

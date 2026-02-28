@@ -7,14 +7,15 @@ import type { DepthFirstGroundTruth } from "./data.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: Depth-First Generation
 
 ## Objective
-You are given a code specification describing a transformation, along with 3
-worked examples. Figure out the transformation rule and apply it to 20 test
-inputs.
+You are given 6 worked examples showing an input-output transformation. The rule
+is NOT described — you must infer it purely from the examples. The transformation
+may involve multiple steps, position-dependent operations, conditional logic, or
+structural changes (grids, records). Carefully examine ALL examples before
+forming a hypothesis, as naive single-example interpretations will likely fail.
 
 ## Workspace Contents
-- \`spec.json\` — Task description with transformation rules and worked examples
-- \`examples.json\` — 3 worked examples showing input → output
-- \`test-inputs.json\` — 20 test inputs (each has an \`id\` and \`input\` field)
+- \`spec.json\` — Task category and 6 worked examples showing input → output
+- \`test-inputs.json\` — 30 test inputs (each has an \`id\` and \`input\` field)
 
 ## Submission Format
 Submit a JSON object mapping each **test ID** to its computed output:
@@ -23,9 +24,9 @@ Submit a JSON object mapping each **test ID** to its computed output:
   "answer": {
     "test-{seed}-0": <output for test 0>,
     "test-{seed}-1": <output for test 1>,
-    "test-{seed}-2": <output for test 2>,
     ...
-    "test-{seed}-19": <output for test 19>
+    "test-{seed}-29": <output for test 29>,
+    "methodology": "Description of the rule you inferred and how you applied it"
   }
 }
 \`\`\`
@@ -34,10 +35,12 @@ Use the exact test IDs from \`test-inputs.json\`. Each output should match the
 type shown in the examples (string, number, array, etc.).
 
 ## Scoring
-- **Correctness (50%)** — fraction of test outputs that exactly match
-- **Speed (20%)** — faster submissions score higher
-- **Coverage (15%)** — fraction of test cases you attempted
-- **Methodology (15%)** — include a \`methodology\` key describing your approach
+| Dimension | Weight | Description |
+|---|---|---|
+| Correctness | 70% | Fraction of test outputs that exactly match |
+| Speed | 15% | Faster submissions score higher (linear decay over 180s) |
+| Coverage | 5% | Fraction of test cases you attempted |
+| Methodology | 10% | Include a substantive \`methodology\` key describing the inferred rule |
 
 ## Constraints
 - Time limit: 180 seconds
@@ -109,14 +112,33 @@ export const depthFirstGenModule: ChallengeModule = {
       });
     }
 
+    const methodText = [submission.methodology, submission.reasoning, submission.approach]
+      .find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+    if (!methodText) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `No methodology text found. Add a substantive "methodology" string to earn methodology points.`,
+      });
+    } else if (methodText.trim().length < 40) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `Methodology text is very short (${methodText.trim().length} chars). Provide a concrete rule description for full methodology credit.`,
+      });
+    }
+
     return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
     const data = generateDepthFirstData(seed);
+    const specForAgent = {
+      task_type: data.spec.task_type,
+      examples: data.spec.examples,
+    };
     return {
-      "spec.json": JSON.stringify(data.spec, null, 2),
-      "examples.json": JSON.stringify(data.spec.examples, null, 2),
+      "spec.json": JSON.stringify(specForAgent, null, 2),
       "test-inputs.json": JSON.stringify(data.test_inputs, null, 2),
     };
   },

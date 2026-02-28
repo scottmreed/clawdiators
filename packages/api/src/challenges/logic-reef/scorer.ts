@@ -2,7 +2,7 @@ import { MAX_SCORE } from "@clawdiators/shared";
 import type { ScoringInput, ScoreResult } from "../types.js";
 import type { LogicGroundTruth } from "./data.js";
 
-const WEIGHTS = { validity: 0.4, reasoning_depth: 0.25, speed: 0.15, methodology: 0.2 };
+const WEIGHTS = { validity: 0.5, reasoning: 0.2, speed: 0.15, coverage: 0.15 };
 const TIME_LIMIT = 180;
 
 export function scoreLogic(input: ScoringInput): ScoreResult {
@@ -10,7 +10,6 @@ export function scoreLogic(input: ScoringInput): ScoreResult {
   const groundTruth = gt as unknown as LogicGroundTruth;
 
   // === Validity (0-1000 raw) ===
-  // Each puzzle is scored for correctness
   let validityRaw = 0;
   const pointsPerPuzzle = 1000 / groundTruth.puzzles.length;
 
@@ -25,13 +24,11 @@ export function scoreLogic(input: ScoringInput): ScoreResult {
     if (submittedStr === expectedStr) {
       validityRaw += pointsPerPuzzle;
     } else if (typeof expected === "boolean") {
-      // Accept "yes"/"no" as true/false
       const boolMap: Record<string, string> = { yes: "true", no: "false", "1": "true", "0": "false" };
       if ((boolMap[submittedStr] || submittedStr) === expectedStr) {
         validityRaw += pointsPerPuzzle;
       }
     } else {
-      // Partial credit for close string answers
       if (expectedStr.includes(submittedStr) || submittedStr.includes(expectedStr)) {
         validityRaw += pointsPerPuzzle * 0.5;
       }
@@ -39,39 +36,34 @@ export function scoreLogic(input: ScoringInput): ScoreResult {
   }
   validityRaw = Math.round(validityRaw);
 
-  // === Reasoning Depth (0-1000 raw) ===
-  // Reward concise reasoning — look for optional "reasoning" or "steps" fields
-  let reasoningDepthRaw = 500; // Base score for any submission
-  const reasoning = submission.reasoning ?? submission.steps ?? submission.explanation;
-  if (reasoning) {
-    // Having reasoning at all is good
-    reasoningDepthRaw = 700;
-    // Short, structured reasoning gets bonus
-    const reasoningStr = String(reasoning);
-    if (reasoningStr.length < 500) reasoningDepthRaw = 900;
-    if (reasoningStr.length < 200) reasoningDepthRaw = 1000;
+  // === Reasoning (0-1000 raw) ===
+  let reasoningRaw = 400;
+  const reasoningText = submission.reasoning ?? submission.methodology ?? submission.approach;
+  if (reasoningText) {
+    const reasoningStr = String(reasoningText);
+    if (reasoningStr.length >= 200) reasoningRaw = 1000;
+    else if (reasoningStr.length >= 50) reasoningRaw = 800;
+    else reasoningRaw = 600;
   }
 
   // === Speed (0-1000 raw) ===
   const elapsedSecs = (submittedAt.getTime() - startedAt.getTime()) / 1000;
   const speedRaw = elapsedSecs >= TIME_LIMIT ? 0 : Math.round(1000 * (1 - elapsedSecs / TIME_LIMIT));
 
-  // === Methodology (0-1000 raw) ===
-  let methodologyRaw: number;
-  if (submission.methodology || submission.reasoning || submission.approach) {
-    methodologyRaw = 1000;
-  } else {
-    // Award based on submission completeness
-    const answerKeys = Object.keys(submission).filter(k => submission[k] !== null && submission[k] !== undefined);
-    methodologyRaw = answerKeys.length > 0 ? 600 : 400;
+  // === Coverage (0-1000 raw) ===
+  let attempted = 0;
+  for (const truth of groundTruth.puzzles) {
+    if (submission[truth.id] !== undefined) attempted++;
   }
+  const coverageRaw = groundTruth.puzzles.length > 0
+    ? Math.round((attempted / groundTruth.puzzles.length) * 1000)
+    : 0;
 
-  // Weighted total
   const validity = Math.round(validityRaw * WEIGHTS.validity);
-  const reasoning_depth = Math.round(reasoningDepthRaw * WEIGHTS.reasoning_depth);
+  const reasoning = Math.round(reasoningRaw * WEIGHTS.reasoning);
   const speed = Math.round(speedRaw * WEIGHTS.speed);
-  const methodology = Math.round(methodologyRaw * WEIGHTS.methodology);
-  const total = Math.min(MAX_SCORE, validity + reasoning_depth + speed + methodology);
+  const coverage = Math.round(coverageRaw * WEIGHTS.coverage);
+  const total = Math.min(MAX_SCORE, validity + reasoning + speed + coverage);
 
-  return { breakdown: { validity, reasoning_depth, speed, methodology, total } };
+  return { breakdown: { validity, reasoning, speed, coverage, total } };
 }

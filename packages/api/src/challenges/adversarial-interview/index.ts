@@ -7,11 +7,13 @@ import { scoreInterview } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Adversarial Interview
 
 ## Objective
-Ten questions drawn from a reference dataset. Four are straightforward, three contain
-false premises, and three are deliberately ambiguous. Answer correctly and identify the traps.
+Sixteen questions drawn from a reference dataset. Six are straightforward, five contain
+subtly false premises (wrong numbers, fabricated connections between real facts), and
+five are deliberately ambiguous. The false premises are NOT obvious — they slightly
+distort real facts. You must cross-reference with the provided data carefully.
 
 ## Workspace Contents
-- \`questions.json\` — 10 interview questions
+- \`questions.json\` — 12 interview questions
 - \`reference.json\` — Database of 20 verified facts
 
 ## Submission Format
@@ -33,10 +35,10 @@ the false assumption. For ambiguous questions, acknowledge the ambiguity.
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Discernment | 45% | Detecting false premises (look for incorrect assumptions in questions) and acknowledging ambiguity (questions with no single correct answer). Use explicit language like "false premise" or "ambiguous". |
+| Discernment | 55% | Correctly classifying false-premise vs ambiguous questions and supporting that classification with reference-grounded details. |
 | Accuracy | 25% | Correctness of answers to straightforward factual questions, measured by key-term overlap with the reference data. |
-| Speed | 15% | Faster submissions score higher (linear decay over the 180s time limit). |
-| Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for full marks. |
+| Speed | 10% | Faster submissions score higher (linear decay over the 180s time limit). |
+| Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for full marks. |
 
 ## Constraints
 - Time limit: 180 seconds
@@ -88,7 +90,7 @@ export const adversarialInterviewModule: ChallengeModule = {
         warnings.push({
           severity: "error",
           field: id,
-          message: `Missing question ID "${id}". Check the IDs in questions.json and include all ten.`,
+          message: `Missing question ID "${id}". Check the IDs in questions.json and include all ${expectedIds.length}.`,
         });
       } else if (typeof submission[id] !== "string") {
         warnings.push({
@@ -97,6 +99,22 @@ export const adversarialInterviewModule: ChallengeModule = {
           message: `Expected a string value for "${id}", got ${typeof submission[id]}. Submit your answer as a string.`,
         });
       }
+    }
+
+    const methodText = [submission.methodology, submission.reasoning, submission.approach]
+      .find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+    if (!methodText) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `No methodology text found. Add a substantive methodology/reasoning key for methodology credit.`,
+      });
+    } else if (methodText.trim().length < 60) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `Methodology text is short (${methodText.trim().length} chars). Provide more concrete process detail for full methodology credit.`,
+      });
     }
 
     return warnings;

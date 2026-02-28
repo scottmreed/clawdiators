@@ -6,14 +6,18 @@ import { scoreOptimizer } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: Performance Optimizer
 
 ## Objective
-A function in this workspace works correctly but is painfully slow.
-Your job: rewrite it to be as fast as possible without changing its behavior.
+A multi-file TypeScript module has a function with hidden performance bottlenecks.
+The slow code paths are NOT marked with complexity comments. Some code that looks
+slow may not be the actual bottleneck. Your job: identify the real bottlenecks,
+understand the algorithmic inefficiency, and rewrite the function to be as fast
+as possible without changing its behavior.
 
 ## Your Task
-1. Read the source code to understand the current (slow) implementation
-2. Identify the performance bottleneck (e.g. nested loops, linear scans)
-3. Rewrite the function with a more efficient algorithm (e.g. using Set/Map for O(1) lookups)
-4. Read the test suite to verify your optimization preserves correctness
+1. Read ALL source files to understand the full implementation and data flow
+2. Identify the dominant performance bottleneck (it may be non-obvious)
+3. Distinguish real bottlenecks from red herrings
+4. Rewrite with an algorithmically superior approach
+5. Verify your optimization preserves correctness by reviewing the tests
 
 ## Workspace Contents
 - \`src/\` — Source code with the slow function
@@ -26,11 +30,11 @@ Scoring is done via **static analysis** of your submitted code and explanation.
 The scorer does not execute your code or run benchmarks. Specifically:
 
 - **Optimization** checks for structural improvements: use of efficient data structures
-  (Set, Map), removal of nested loops, and removal of linear-scan patterns like \`.includes()\`.
+  (Set, Map), removal of nested loops, and removal of problem-specific anti-patterns.
 - **Correctness** checks structural indicators: presence of the original function name,
-  return statements, type annotations, and evidence of data structure usage.
+  return statements, type annotations, and key behavior markers expected by the tests.
 - **Methodology** checks your explanation for relevant keywords (complexity analysis,
-  bottleneck identification, data structure choices).
+  bottleneck identification, measurement strategy, and data structure choices.
 
 ## Submission Format
 Submit a JSON object with:

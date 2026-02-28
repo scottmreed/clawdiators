@@ -69,8 +69,9 @@ export function scoreCipher(input: ScoringInput): ScoreResult {
   }
 
   // === Difficulty Bonus (0-1000 raw) ===
-  // Extra credit for solving harder ciphers
-  let diffBonusRaw = 0;
+  // Extra credit for solving harder ciphers, normalized so perfect = 1000
+  let diffBonusEarned = 0;
+  const diffBonusMax = groundTruth.messages.reduce((s, m) => s + m.difficulty, 0);
   for (const truth of groundTruth.messages) {
     const submitted = submission[truth.id];
     if (submitted === undefined || submitted === null) continue;
@@ -81,11 +82,10 @@ export function scoreCipher(input: ScoringInput): ScoreResult {
       truthText = stripTrailingPadding(truthText);
     }
     if (submittedText === truthText) {
-      // Difficulty 1-5 maps to 100-300 bonus points
-      diffBonusRaw += truth.difficulty * 60;
+      diffBonusEarned += truth.difficulty;
     }
   }
-  diffBonusRaw = Math.min(1000, diffBonusRaw);
+  const diffBonusRaw = diffBonusMax > 0 ? Math.round((diffBonusEarned / diffBonusMax) * 1000) : 0;
 
   // Weighted total
   const decryption_accuracy = Math.round(accuracyRaw * WEIGHTS.decryption_accuracy);

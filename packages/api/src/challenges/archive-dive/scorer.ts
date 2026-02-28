@@ -41,6 +41,7 @@ function keyTermOverlap(submitted: string, keyTerms: string[]): number {
 export function scoreArchive(input: ScoringInput): ScoreResult {
   const { submission, groundTruth: gt, startedAt, submittedAt } = input;
   const groundTruth = gt as unknown as ArchiveGroundTruth;
+  const qualityByQuestion = new Map<string, number>();
 
   // === Accuracy (0-1000 raw) ===
   // For each question: up to POINTS_PER_QUESTION based on answer quality
@@ -61,6 +62,7 @@ export function scoreArchive(input: ScoringInput): ScoreResult {
 
     // Combined: 60% word overlap + 40% key term coverage
     const questionScore = overlap * 0.6 + termCoverage * 0.4;
+    qualityByQuestion.set(truth.question_id, questionScore);
     accuracyRaw += Math.round(questionScore * POINTS_PER_QUESTION);
   }
 
@@ -130,23 +132,62 @@ export function scoreArchive(input: ScoringInput): ScoreResult {
   const speedRaw = elapsedSecs >= TIME_LIMIT ? 0 : Math.round(1000 * (1 - elapsedSecs / TIME_LIMIT));
 
   // === Citations (0-1000 raw) ===
-  // Uses same flat-key format as accuracy/comprehensiveness: submission[qid] and submission[qid + "_evidence"]
+  // Citation quality is only scored when the answer has at least minimal content quality.
   let citationsRaw = 0;
   for (const truth of groundTruth.answers) {
     const submittedAnswer = submission[truth.question_id];
     const submittedEvidence = submission[`${truth.question_id}_evidence`];
 
     if (submittedAnswer === undefined || submittedAnswer === null) continue;
+    const answerQuality = qualityByQuestion.get(truth.question_id) ?? 0;
+    if (answerQuality < 0.2) continue;
 
-    if (Array.isArray(submittedEvidence) && (submittedEvidence as unknown[]).length > 0) {
-      // Agent provided structured evidence — full credit for this question
-      citationsRaw += 200;
-    } else if (typeof submittedAnswer === "string" && /doc[_-]?\w+\d|document/i.test(submittedAnswer)) {
-      // Answer text mentions doc IDs — partial credit
-      citationsRaw += 100;
+    let citationScore = 0;
+    const truthDocPages = new Set(truth.evidence.map((e) => `${e.doc_id}:${e.page}`));
+    const truthDocs = new Set(truth.evidence.map((e) => e.doc_id));
+
+    if (Array.isArray(submittedEvidence)) {
+      const submittedDocPages = new Set<string>();
+      const submittedDocs = new Set<string>();
+
+      for (const cite of submittedEvidence) {
+        if (!cite || typeof cite !== "object") continue;
+        const citeObj = cite as Record<string, unknown>;
+        const docId = String(citeObj.doc_id || "");
+        const page = Number(citeObj.page ?? -1);
+        if (!docId || Number.isNaN(page) || page < 0) continue;
+        submittedDocs.add(docId);
+        submittedDocPages.add(`${docId}:${page}`);
+      }
+
+      let exactMatches = 0;
+      for (const key of submittedDocPages) {
+        if (truthDocPages.has(key)) exactMatches++;
+      }
+      let docMatches = 0;
+      for (const docId of submittedDocs) {
+        if (truthDocs.has(docId)) docMatches++;
+      }
+
+      const pageMatchRatio = truth.evidence.length > 0 ? exactMatches / truth.evidence.length : 0;
+      const docMatchRatio = truthDocs.size > 0 ? docMatches / truthDocs.size : 0;
+      // Page-accurate citations carry most of the credit.
+      citationScore = Math.min(1, pageMatchRatio * 0.8 + docMatchRatio * 0.2);
+    } else if (typeof submittedAnswer === "string") {
+      const answerText = normalize(submittedAnswer);
+      let mentionedDocs = 0;
+      for (const docId of truthDocs) {
+        if (answerText.includes(normalize(docId))) mentionedDocs++;
+      }
+      const mentionRatio = truthDocs.size > 0 ? mentionedDocs / truthDocs.size : 0;
+      // Unstructured mentions can still earn a small amount of citation credit.
+      citationScore = mentionRatio * 0.2;
     }
+
+    citationsRaw += Math.round(citationScore * POINTS_PER_QUESTION);
   }
-  citationsRaw = Math.min(1000, citationsRaw);
+  const maxCitations = groundTruth.answers.length * POINTS_PER_QUESTION;
+  citationsRaw = maxCitations > 0 ? Math.round((citationsRaw / maxCitations) * 1000) : 0;
 
   // === Weighted total ===
   const accuracy = Math.round(accuracyRaw * WEIGHTS.accuracy);

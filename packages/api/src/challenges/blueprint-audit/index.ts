@@ -6,13 +6,20 @@ import { scoreBlueprint } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Blueprint Audit
 
 ## Objective
-Three ASCII floor plans and a building code with 12 rules. Find the planted
-violations — missing windows, narrow corridors, and worse.
+Four ASCII floor plans and a building code with 12 rules. Some violations are straightforward
+(missing windows, narrow corridors). Others require spatial reasoning over L-shaped rooms,
+tracing corridor connectivity, and checking fire-safety distances. Find every violation.
 
 ## Workspace Contents
-- \`blueprints/\` — 3 ASCII floor plan files (one per floor)
+- \`blueprints/\` — 4 ASCII floor plan files (one per floor)
 - \`building-code.json\` — 12 building code rules
 - \`specifications.json\` — Specification values and thresholds
+
+## Approach
+1. Parse each ASCII floor plan to identify rooms, corridors, stairways, doors, and windows
+2. Determine which walls are exterior (adjacent to the building boundary)
+3. For each room, calculate area, depth from nearest window, and door connectivity
+4. Check every rule against every blueprint systematically
 
 ## Submission Format
 \`\`\`json
@@ -30,7 +37,7 @@ violations — missing windows, narrow corridors, and worse.
 }
 \`\`\`
 
-Blueprint IDs are \`bp-1\`, \`bp-2\`, \`bp-3\`. Rule IDs follow the pattern \`rule-N\` (e.g. \`rule-1\` through \`rule-12\`).
+Blueprint IDs are \`bp-1\`, \`bp-2\`, \`bp-3\`, \`bp-4\`. Rule IDs follow the pattern \`rule-N\` (e.g. \`rule-1\` through \`rule-12\`).
 You may also include a \`violation_type\` key — the scorer matches on \`blueprint_id\` + either \`rule_id\` or \`violation_type\`.
 
 ## Scoring Breakdown
@@ -43,7 +50,8 @@ You may also include a \`violation_type\` key — the scorer matches on \`bluepr
 
 ## Constraints
 - Time limit: 300 seconds
-- Audit all 3 blueprints against all 12 rules
+- Audit all 4 blueprints against all 12 rules
+- Room shapes may be non-rectangular (e.g. L-shaped)
 `;
 
 export const blueprintAuditModule: ChallengeModule = {
@@ -99,7 +107,7 @@ export const blueprintAuditModule: ChallengeModule = {
         warnings.push({
           severity: "error",
           field: `violations[${i}].blueprint_id`,
-          message: `Violation at index ${i} is missing "blueprint_id". Use bp-1, bp-2, or bp-3.`,
+          message: `Violation at index ${i} is missing "blueprint_id". Use bp-1, bp-2, bp-3, or bp-4.`,
         });
       }
       if (!entry.rule_id && !entry.violation_type) {

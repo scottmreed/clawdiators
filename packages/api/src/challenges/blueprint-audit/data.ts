@@ -385,15 +385,117 @@ export function generateBlueprintData(seed: number): BlueprintData {
 
   const bp3Ascii = gridToString(grid3);
 
+  // ── Blueprint 4: Fourth Floor (L-shaped rooms, fire doors, unreachable room) ─
+
+  const grid4 = blankGrid();
+  const rooms4: RoomMeta[] = [];
+
+  // Exterior walls
+  for (let r = 0; r < 20; r++) {
+    grid4[r][0] = "#";
+    grid4[r][29] = "#";
+  }
+  for (let c = 0; c < 30; c++) {
+    grid4[0][c] = "#";
+    grid4[19][c] = "#";
+  }
+
+  // Room R: L-shaped room (top-left). Two rectangles merged with shared wall removed.
+  // Top part: rows 1-6, cols 1-14. Bottom part: rows 7-10, cols 1-8.
+  drawRoom(grid4, 1, 1, 6, 14, "R", [[6, 10]], [[0, 5], [0, 9]]);
+  drawRoom(grid4, 7, 1, 10, 8, "R", [], []);
+  // Remove the shared wall between the two parts
+  for (let c = 2; c <= 7; c++) {
+    grid4[6][c] = "R"; // was wall #, now interior
+  }
+  grid4[7][1] = "#"; // keep outer wall
+  grid4[7][8] = "#"; // keep outer wall
+  rooms4.push({ label: "R", floor: 4, topRow: 1, leftCol: 1, bottomRow: 10, rightCol: 14 });
+
+  // Room R has windows on top exterior wall only (cols 5 and 9).
+  // The L-shape extends down to row 10. Farthest interior from window is row 9 (9 units from row 0 window).
+  // This is a rule 11 violation (depth > 8) but tricky because it's L-shaped.
+  violations.push({
+    id: `v-${++violationId}`,
+    blueprint_id: "bp-4",
+    rule_id: "rule-11",
+    violation_type: "excessive_room_depth",
+    location: "Room R (L-shaped), Floor 4",
+    description: "Room R is L-shaped. The bottom portion extends to row 10, giving a depth of 9 units from the nearest windows at row 0. Rule 11 limits depth to 8 units.",
+  });
+
+  // Room T: top-right, habitable room on exterior wall but NO windows on the right exterior wall
+  // (violation rule 7: windows required on ALL exterior-facing walls of habitable rooms)
+  drawRoom(grid4, 1, 18, 8, 28, "T", [[8, 23]], [[0, 22], [0, 25]]);
+  rooms4.push({ label: "T", floor: 4, topRow: 1, leftCol: 18, bottomRow: 8, rightCol: 28 });
+  // Room T has windows on top wall (exterior) but none on right wall (col 28, also exterior).
+  // The right wall at col 28 IS adjacent to col 29 (the building exterior). No W on that wall.
+  violations.push({
+    id: `v-${++violationId}`,
+    blueprint_id: "bp-4",
+    rule_id: "rule-7",
+    violation_type: "missing_exterior_window",
+    location: "Room T, Floor 4, right exterior wall",
+    description: "Room T has an exterior-facing right wall (column 28, adjacent to building exterior at column 29) with no windows. Rule 7 requires windows on all exterior-facing walls of habitable rooms.",
+  });
+
+  // Long corridor without fire doors: row 11, cols 1-28 (27 units > 15, violation rule 8)
+  for (let c = 1; c <= 28; c++) {
+    grid4[10][c] = "#"; // wall above corridor
+    grid4[12][c] = "#"; // wall below corridor
+  }
+  // Row 11 is the corridor (1 char high, but 2 chars wide counting row 11 passage)
+  // Actually make it 2 chars wide: rows 11-12 are corridor, row 13 is wall
+  for (let c = 1; c <= 28; c++) {
+    grid4[10][c] = "#"; // wall
+    grid4[11][c] = " "; // corridor
+    grid4[13][c] = "#"; // wall below
+    grid4[12][c] = " "; // corridor
+  }
+  // The corridor spans cols 1-28 = 28 units with no fire door. Rule 8 requires F every 15 units.
+  violations.push({
+    id: `v-${++violationId}`,
+    blueprint_id: "bp-4",
+    rule_id: "rule-8",
+    violation_type: "missing_fire_door",
+    location: "Corridor at rows 11-12, Floor 4",
+    description: "Corridor section spans 28 units (columns 1-28) without any fire doors. Rule 8 requires fire doors separating corridor sections longer than 15 units.",
+  });
+
+  // Room U: enclosed room with NO door (violation rule 12: all rooms reachable from corridor via door)
+  drawRoom(grid4, 14, 1, 18, 8, "U", [], [[18, 4]]);
+  rooms4.push({ label: "U", floor: 4, topRow: 14, leftCol: 1, bottomRow: 18, rightCol: 8 });
+  violations.push({
+    id: `v-${++violationId}`,
+    blueprint_id: "bp-4",
+    rule_id: "rule-12",
+    violation_type: "unreachable_room",
+    location: "Room U, Floor 4",
+    description: "Room U has no doors and is not reachable from any corridor. Rule 12 requires all rooms to be reachable from at least one corridor via a door.",
+  });
+
+  // Room V: compliant mid-right
+  drawRoom(grid4, 14, 16, 18, 28, "V", [[14, 22]], [[18, 20], [18, 25]]);
+  rooms4.push({ label: "V", floor: 4, topRow: 14, leftCol: 16, bottomRow: 18, rightCol: 28 });
+
+  // Two compliant stairways
+  drawStairway(grid4, 14, 10, 18, 14);
+  drawStairway(grid4, 1, 15, 4, 17);
+
+  // Emergency exits
+  grid4[19][7] = "D";
+  grid4[19][22] = "D";
+
+  const bp4Ascii = gridToString(grid4);
+
   // ── Shuffle violation order based on seed ──────────────────────────
   const shuffledViolations = shuffle(violations);
-  // Re-assign IDs after shuffle for consistency
   shuffledViolations.forEach((v, i) => {
     v.id = `v-${i + 1}`;
   });
 
   // ── Determine compliant blueprints ────────────────────────────────
-  const blueprintIds = ["bp-1", "bp-2", "bp-3"];
+  const blueprintIds = ["bp-1", "bp-2", "bp-3", "bp-4"];
   const violatedBpIds = new Set(shuffledViolations.map((v) => v.blueprint_id));
   const compliantBps = blueprintIds.filter((id) => !violatedBpIds.has(id));
 
@@ -408,6 +510,7 @@ export function generateBlueprintData(seed: number): BlueprintData {
     { id: "bp-1", name: `${namePool[0]} — Ground Floor`, floor: 1, ascii: bp1Ascii, legend: LEGEND },
     { id: "bp-2", name: `${namePool[1]} — Second Floor`, floor: 2, ascii: bp2Ascii, legend: LEGEND },
     { id: "bp-3", name: `${namePool[2]} — Third Floor`, floor: 3, ascii: bp3Ascii, legend: LEGEND },
+    { id: "bp-4", name: `${namePool[3]} — Fourth Floor`, floor: 4, ascii: bp4Ascii, legend: LEGEND },
   ];
 
   const specifications: Record<string, number> = {
@@ -420,10 +523,10 @@ export function generateBlueprintData(seed: number): BlueprintData {
   };
 
   const objective =
-    "Audit 3 architectural blueprints against the building code. " +
-    "Retrieve each floor plan (ASCII art) and the full set of building rules. " +
+    "Audit 4 architectural blueprints against the building code (12 rules). " +
+    "Floor plans include standard rectangular rooms and L-shaped rooms requiring careful spatial reasoning. " +
     "Identify all code violations, specifying the blueprint, rule violated, location, and description for each. " +
-    "Submit your findings as a list of violations.";
+    "Be thorough: every rule in the code may or may not be violated. Submit your findings as a list of violations.";
 
   return {
     blueprints,

@@ -129,7 +129,6 @@ challengeRoutes.get("/:slug/versions", async (c) => {
       id: v.id,
       version: v.version,
       changelog: v.changelog,
-      created_at: v.archivedAt?.toISOString() ?? new Date().toISOString(),
       archived_at: v.archivedAt?.toISOString() ?? null,
     }));
 

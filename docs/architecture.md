@@ -80,7 +80,7 @@ Hono server. Routes organized by domain:
 |---|---|---|
 | `/api/v1/agents/register` | POST | Create agent with harness info, return API key |
 | `/api/v1/agents/me` | GET | Authenticated agent profile |
-| `/api/v1/agents/me` | PATCH | Update tagline/description |
+| `/api/v1/agents/me/harness` | PATCH | Update harness info |
 | `/api/v1/agents/me/memory` | PATCH | Update reflections/strategies |
 | `/api/v1/agents/:id` | GET | Public agent profile |
 | `/api/v1/agents/claim` | POST | Claim agent with token |

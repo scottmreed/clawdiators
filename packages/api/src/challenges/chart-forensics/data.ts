@@ -116,14 +116,14 @@ const TABLE_TEMPLATES: TableTemplate[] = [
 
 // ── Issue types ─────────────────────────────────────────────────────
 
-type IssueType = "wrong_height" | "swapped_label" | "misleading_scale" | "missing_data" | "wrong_value";
+type IssueType = "wrong_height" | "swapped_label" | "misleading_scale" | "missing_data" | "inverted_order";
 
 const ALL_ISSUE_TYPES: IssueType[] = [
   "wrong_height",
   "swapped_label",
   "misleading_scale",
   "missing_data",
-  "wrong_value",
+  "inverted_order",
 ];
 
 // ── SVG generation ──────────────────────────────────────────────────
@@ -169,7 +169,6 @@ function generateBarSvg(
     const y = bottomY - clampedHeight;
     bars += `<rect x="${x}" y="${y}" width="${barWidth}" height="${clampedHeight}" fill="#4A90D9"/>`;
     bars += `<text x="${x + barWidth / 2}" y="${bottomY + 15}" text-anchor="middle" font-size="10">${labels[i]}</text>`;
-    bars += `<text x="${x + barWidth / 2}" y="${y - 5}" text-anchor="middle" font-size="9">${values[i]}</text>`;
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="white"/>${bars}</svg>`;
@@ -223,7 +222,6 @@ function generateLineSvg(
   for (let i = 0; i < labels.length; i++) {
     content += `<circle cx="${points[i].x}" cy="${points[i].y}" r="4" fill="#4A90D9"/>`;
     content += `<text x="${points[i].x}" y="${bottomY + 15}" text-anchor="middle" font-size="10">${labels[i]}</text>`;
-    content += `<text x="${points[i].x}" y="${points[i].y - 8}" text-anchor="middle" font-size="9">${values[i]}</text>`;
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="white"/>${content}</svg>`;
@@ -338,7 +336,7 @@ export function generateForensicsData(seed: number): ForensicsData {
   }
 
   const objective =
-    "Analyze the data tables and their corresponding charts. Some charts contain deliberate misrepresentations of the underlying data: wrong bar heights, swapped labels, misleading scales, missing data points, or incorrect values. Identify which charts have issues, the type of each issue, and which specific items are affected. Submit your findings as { issues: [{ chart_id, issue_type, description }] }. Valid issue types: wrong_height, swapped_label, misleading_scale, missing_data, wrong_value.";
+    "Analyze the data tables and their corresponding SVG charts. Charts do NOT include value annotations — you must compute data values from SVG geometry (bar heights, point positions, axis scales). Some charts contain deliberate misrepresentations: subtly wrong bar heights, swapped labels, misleading y-axis scales (not starting at 0), missing data points, or inverted data order. Identify which charts have issues, the type of each issue, and which specific items are affected. Submit your findings as { issues: [{ chart_id, issue_type, description }] }. Valid issue types: wrong_height, swapped_label, misleading_scale, missing_data, inverted_order.";
 
   return {
     tables,
@@ -367,8 +365,8 @@ function applyIssue(
       // Change one bar/point's displayed height to be incorrect
       const idx = Math.floor(rng() * labels.length);
       const corruptedValues = [...values];
-      // Make the value differ by 30-70% from actual
-      const factor = 0.3 + rng() * 0.4;
+      // Make the value differ by 10-30% from actual (subtle)
+      const factor = 0.1 + rng() * 0.2;
       const direction = rng() < 0.5 ? 1 : -1;
       const delta = Math.round(values[idx] * factor);
       corruptedValues[idx] = values[idx] + direction * delta;
@@ -457,97 +455,24 @@ function applyIssue(
       };
     }
 
-    case "wrong_value": {
-      // Chart shows a different number as the value text label, but the bar height is correct
-      const idx = Math.floor(rng() * labels.length);
-      const wrongLabels = [...labels];
-      const displayValues = [...values];
-      // The displayed text value is wrong, but the bar height matches the real value
-      const offset = Math.round(values[idx] * (0.15 + rng() * 0.35));
-      const wrongVal = rng() < 0.5 ? values[idx] + offset : values[idx] - offset;
-      const textValues = [...values];
-      textValues[idx] = wrongVal;
-
-      // Build SVG with correct heights but wrong text label for one bar
-      const svg = buildSvgWithWrongText(
-        chartType, labels, values, textValues, maxVal, tableName, idx,
-      );
+    case "inverted_order": {
+      // Values are plotted in reversed order while labels stay the same
+      const reversedValues = [...values].reverse();
+      const svg = chartType === "bar"
+        ? generateBarSvg(labels, reversedValues, maxVal, tableName)
+        : generateLineSvg(labels, reversedValues, maxVal, tableName);
 
       return {
         svg,
-        description: `${typeName} chart showing ${tableName.toLowerCase()}. Values are annotated on each ${chartType === "bar" ? "bar" : "data point"}.`,
+        description: `${typeName} chart showing ${tableName.toLowerCase()}. All ${labels.length} categories are represented.`,
         issue: {
           chart_id: chartId,
-          issue_type: "wrong_value",
-          description: `The chart displays "${wrongVal}" as the value for "${labels[idx]}" but the table shows ${values[idx]}. The ${chartType === "bar" ? "bar height" : "point position"} appears to match the table data, but the text annotation is wrong.`,
-          affected_items: [labels[idx]],
+          issue_type: "inverted_order",
+          description: `The data values are plotted in reversed order relative to the labels. "${labels[0]}" shows the value for "${labels[labels.length - 1]}" and vice versa.`,
+          affected_items: labels.slice(),
         },
       };
     }
   }
 }
 
-/**
- * Build an SVG where bar heights match `realValues` but text annotations
- * use `textValues` — enabling the "wrong_value" issue type.
- */
-function buildSvgWithWrongText(
-  chartType: "bar" | "line",
-  labels: string[],
-  realValues: number[],
-  textValues: number[],
-  maxVal: number,
-  title: string,
-  _affectedIdx: number,
-): string {
-  const width = 400;
-  const height = 300;
-  const chartHeight = 230;
-  const topPadding = 40;
-  const bottomY = topPadding + chartHeight;
-
-  let content = "";
-  content += `<text x="${width / 2}" y="20" text-anchor="middle" font-size="14" font-weight="bold">${title}</text>`;
-  content += `<line x1="45" y1="${topPadding}" x2="45" y2="${bottomY}" stroke="#333" stroke-width="1"/>`;
-  content += `<line x1="45" y1="${bottomY}" x2="${width - 10}" y2="${bottomY}" stroke="#333" stroke-width="1"/>`;
-
-  // Y-axis labels
-  for (let t = 0; t <= 4; t++) {
-    const tickVal = Math.round((maxVal * t) / 4);
-    const tickY = bottomY - (chartHeight * t) / 4;
-    content += `<text x="40" y="${tickY + 4}" text-anchor="end" font-size="9">${tickVal}</text>`;
-    content += `<line x1="43" y1="${tickY}" x2="47" y2="${tickY}" stroke="#333" stroke-width="1"/>`;
-  }
-
-  if (chartType === "bar") {
-    const barWidth = 50;
-    const gap = 20;
-    for (let i = 0; i < labels.length; i++) {
-      const barHeight = maxVal > 0 ? (realValues[i] / maxVal) * chartHeight : 0;
-      const x = 55 + i * (barWidth + gap);
-      const y = bottomY - barHeight;
-      content += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="#4A90D9"/>`;
-      content += `<text x="${x + barWidth / 2}" y="${bottomY + 15}" text-anchor="middle" font-size="10">${labels[i]}</text>`;
-      // Use textValues for the annotation
-      content += `<text x="${x + barWidth / 2}" y="${y - 5}" text-anchor="middle" font-size="9">${textValues[i]}</text>`;
-    }
-  } else {
-    const gap = 50;
-    const points: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i < labels.length; i++) {
-      const x = 60 + i * gap;
-      const ptHeight = maxVal > 0 ? (realValues[i] / maxVal) * chartHeight : 0;
-      const y = bottomY - ptHeight;
-      points.push({ x, y });
-    }
-    const polyPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-    content += `<polyline points="${polyPoints}" fill="none" stroke="#4A90D9" stroke-width="2"/>`;
-    for (let i = 0; i < labels.length; i++) {
-      content += `<circle cx="${points[i].x}" cy="${points[i].y}" r="4" fill="#4A90D9"/>`;
-      content += `<text x="${points[i].x}" y="${bottomY + 15}" text-anchor="middle" font-size="10">${labels[i]}</text>`;
-      content += `<text x="${points[i].x}" y="${points[i].y - 8}" text-anchor="middle" font-size="9">${textValues[i]}</text>`;
-    }
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="white"/>${content}</svg>`;
-}

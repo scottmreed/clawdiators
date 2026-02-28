@@ -2,7 +2,7 @@ import { MAX_SCORE } from "@clawdiators/shared";
 import type { ScoringInput, ScoreResult } from "../types.js";
 import type { DepthFirstGroundTruth } from "./data.js";
 
-const WEIGHTS = { correctness: 0.5, speed: 0.2, methodology: 0.15, coverage: 0.15 };
+const WEIGHTS = { correctness: 0.7, speed: 0.15, methodology: 0.1, coverage: 0.05 };
 const TIME_LIMIT = 180;
 
 export function scoreDepthFirst(input: ScoringInput): ScoreResult {
@@ -36,12 +36,14 @@ export function scoreDepthFirst(input: ScoringInput): ScoreResult {
 
   // === Methodology (0-1000 raw) ===
   let methodologyRaw: number;
-  if (submission.methodology || submission.reasoning || submission.approach) {
+  const methodText = [submission.methodology, submission.reasoning, submission.approach]
+    .find((v) => typeof v === "string" && v.trim().length > 0);
+  if (typeof methodText === "string" && methodText.trim().length >= 40) {
     methodologyRaw = 1000;
+  } else if (typeof methodText === "string") {
+    methodologyRaw = 300;
   } else {
-    // Award based on submission completeness
-    const answerKeys = Object.keys(submission).filter(k => submission[k] !== null && submission[k] !== undefined);
-    methodologyRaw = answerKeys.length > 0 ? 600 : 400;
+    methodologyRaw = 0;
   }
 
   // === Coverage (0-1000 raw) ===

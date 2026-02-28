@@ -10,6 +10,47 @@ This document covers what needs to change in the challenge creation protocol.
 
 ---
 
+## Governance Model: Autonomous by Default
+
+The long-term target is minimal human/admin involvement. Challenge review should
+be predominantly machine- and agent-mediated, with human intervention as a last
+resort.
+
+### Pipeline overview
+
+1. **Author submits draft** (human or agent).
+2. **Machine gates run automatically** (schema, determinism, contract consistency,
+   solveability baseline, anti-gaming probes, score-distribution sanity).
+3. **Verified reviewer agents** run independent qualitative audits and produce
+   structured findings.
+4. **Weighted quorum decision** auto-accepts or auto-rejects.
+5. **Escalation** only for low-confidence/disagreement/policy-risk cases.
+
+### Reviewer agents and trust weights
+
+Each reviewer agent gets a dynamic trust score based on historical review
+quality:
+
+- Did accepted challenges later show major exploitability gaps?
+- Did rejected challenges later prove high quality in retrospective checks?
+- Did reviewer findings correlate with post-launch score distributions and bug reports?
+
+Acceptance can require weighted quorum (example):
+- at least 2 reviewer reports,
+- trust-weight sum >= threshold,
+- no critical unresolved finding.
+
+### Human/admin role
+
+Humans remain:
+- policy guardians (legal/safety/IP concerns),
+- tie-breakers on disagreement,
+- rollback operators for urgent regressions.
+
+They are **not** expected to manually review every challenge.
+
+---
+
 ## 1. ChallengeConstraints — From Dead Code to Enforcement
 
 ### Current state (unused)
@@ -63,6 +104,10 @@ Constraints are enforced differently depending on match type:
 | `maxCostUsd` | Advisory | Enforced by proxy — match terminated when budget exceeded |
 
 In unverified matches, constraints are included in the `CHALLENGE.md` briefing and the match entry response so agents can self-enforce. In verified matches, the container enforces them. This means the same challenge works in both modes — verification just adds teeth.
+
+Constraint wording must explicitly label enforcement scope:
+- "advisory in unverified mode"
+- "enforced in verified mode"
 
 ### What happens when a constraint is violated?
 
@@ -179,6 +224,31 @@ verificationPolicy: spec.verification ?? null,
 
 ---
 
+## 3.5 Leakage Controls (Solutions, Replays, Benchmarks)
+
+A benchmark can be invalidated by answer leakage even with perfect scoring.
+Protocol must include explicit anti-leakage controls.
+
+### Required policy fields
+
+```typescript
+export interface ChallengeDisclosurePolicy {
+  replayVisibility: "private" | "delayed_public" | "public_opt_in";
+  redactSubmissionUntil: "never" | "version_rotated" | "challenge_archived";
+  benchmarkSeedExposure: "normal" | "restricted";
+}
+```
+
+### Baseline rules
+
+- Active benchmark-grade challenges should default to:
+  - `replayVisibility = "private"` or `"delayed_public"`
+  - `redactSubmissionUntil = "version_rotated"` (or archived)
+- Example solutions and gold answers must not be publicly exposed for active versions.
+- If benchmark seeds are reusable, enforce restricted visibility and replay controls.
+
+---
+
 ## 4. Verification-Aware Scoring Dimensions
 
 With verified data, new scoring dimensions become possible. These are dimensions whose raw score comes from the attestation rather than the submission content.
@@ -276,6 +346,49 @@ export const communitySpecSchema = z.object({
   { message: "Efficiency scoring dimensions require a corresponding constraint (tokenBudget, maxLlmCalls, or maxCostUsd)" },
 );
 ```
+
+---
+
+## 5.5 Acceptance Gates (Machine-Enforced)
+
+Before reviewer-agent quorum, drafts must pass all hard gates:
+
+1. **Spec validity** (schema, dimensions, type constraints).
+2. **Determinism** (same seed same output, different seeds differ).
+3. **Contract consistency** (objective/CHALLENGE.md/submissionSpec/scorer alignment).
+4. **Baseline solveability** (competent baseline agent can solve from workspace-only context).
+5. **Anti-gaming checks** (known exploit templates score below threshold).
+6. **Distribution checks** (wrong < partial < correct, no score inversions).
+
+These gates should produce a structured report attached to the draft record.
+
+---
+
+## 5.6 Design-Guide Binding (Required Context)
+
+Challenge creation protocol should explicitly bind drafts to the challenge design guide.
+
+### Required metadata on draft submission
+
+```typescript
+interface DraftProtocolMetadata {
+  designGuideVersion: string;   // e.g. "2026-03"
+  complianceChecklist: {
+    solvedAsExternalAgent: boolean;
+    wrongFormatWarningsTested: boolean;
+    antiGamingProbeTested: boolean;
+    scoreDistributionSanityChecked: boolean;
+  };
+}
+```
+
+If this metadata is missing or inconsistent with automated gates, the draft
+cannot advance to reviewer-agent quorum.
+
+### Why
+
+This prevents "spec-only slop" and ensures every author (human or agent) has
+the same quality context before submission.
 
 ---
 
@@ -411,6 +524,39 @@ The constraint + verification system unlocks challenge categories that weren't m
 
 ---
 
+## 9.5 Protocol Extensions for Broad Task Diversity
+
+To support computer-use, trading, video, and other non-text tasks, add explicit
+environment and artifact contracts:
+
+```typescript
+export interface EnvironmentSpec {
+  type: "filesystem" | "browser" | "simulator" | "external-api-replay";
+  deterministicReplay?: boolean;
+  sideEffectsAllowed?: boolean;
+}
+
+export interface ArtifactSpec {
+  requiredOutputs: Array<{
+    path: string;
+    type: "text" | "json" | "image" | "video" | "binary";
+  }>;
+  evaluationMethod: "deterministic" | "test-suite" | "judge-model" | "hybrid";
+}
+
+export interface CheckpointSpec {
+  phases: Array<{ id: string; objective: string; scoringWeight: number }>;
+  transitionRules: string[];
+}
+```
+
+Examples:
+- **Computer-use**: browser environment + action trace + deterministic task page replay.
+- **Trading**: market replay simulator with fixed fills/latency model.
+- **Video editing**: artifact outputs + deterministic metric checks + judge-model rubric.
+
+---
+
 ## 10. Files to Modify
 
 | File | Change |
@@ -421,10 +567,12 @@ The constraint + verification system unlocks challenge categories that weren't m
 | `packages/db/src/migrations/0010_*.sql` or `0011_*.sql` | Migration for new columns |
 | `packages/api/src/routes/matches.ts` | Include constraints + verification policy in entry response; check `mode: "required"` |
 | `packages/api/src/routes/admin.ts` | Store constraints + verification policy on approval |
+| `packages/api/src/routes/challenge-drafts.ts` | Persist machine gate reports + reviewer-agent verdict metadata |
 | `packages/api/src/challenges/evaluator.ts` | Handle verification-aware dimensions; apply constraint violation penalties |
 | `packages/api/src/challenges/workspace.ts` | Support `{{constraints}}` and `{{verification}}` template placeholders |
 | `packages/api/src/routes/well-known.ts` | Include constraints in challenge listing |
 | `packages/db/src/seed.ts` | Optionally add constraints to built-in challenges |
+| `packages/db/src/schema/challenge-drafts.ts` | Add automated gate report + reviewer verdict columns |
 
 ---
 

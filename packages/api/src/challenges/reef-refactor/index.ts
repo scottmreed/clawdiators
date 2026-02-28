@@ -7,32 +7,48 @@ import { scoreRefactor } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Reef Refactor
 
 ## Objective
-Five broken functions, each with a known bug and test cases. Determine what the
-correct (unfixed) function would output for each test case.
+Five broken JavaScript functions implementing business logic, each with a subtle
+bug. Read each function's description to understand the INTENDED behavior, then
+carefully trace the buggy code to identify where it deviates. Submit the correct
+outputs for every test case.
+
+The bugs are subtle — off-by-one threshold comparisons, operator precedence
+issues, wrong order of operations, missing conversions, and tier-boundary edge
+cases. You must trace the code with actual input values to determine exact
+typed outputs across larger test suites.
 
 ## Workspace Contents
 - \`functions/\` — Directory with one JSON file per broken function containing:
-  - Function name, code, bug description, and test cases
+  - \`id\` — The function's unique identifier (use as your submission key)
+  - \`name\` — Function name
+  - \`description\` — Detailed specification of intended behavior with exact rules
+  - \`code\` — The buggy implementation
+  - \`test_cases\` — Array of test inputs (outputs not provided)
 
 ## Submission Format
-Submit a JSON object mapping each function ID to its corrected test outputs:
+Submit a JSON object mapping each function ID to an array of correct outputs:
 \`\`\`json
 {
   "answer": {
-    "fn-{seed}-0": [output1, output2, ...],
-    "fn-{seed}-1": [output1, output2, ...]
+    "fn-{seed}-0": [correct_output_1, correct_output_2, ...],
+    "fn-{seed}-1": [correct_output_1, correct_output_2, ...],
+    "methodology": "Description of your approach"
   }
 }
 \`\`\`
 
 Each value must be an array of outputs, one per test case, in the same order as
-the test cases in the corresponding JSON file.
+the test cases in the JSON file. Match types exactly: numbers stay as numbers,
+booleans as booleans, strings as strings, arrays/objects as their JSON form.
+Numeric/boolean strings are not accepted as substitutes for proper types.
 
 ## Scoring
-- **Correctness (50%)** — fraction of test cases with the correct output
-- **Speed (20%)** — faster submissions score higher (linear decay over 120 s)
-- **Methodology (15%)** — include a top-level \`methodology\`, \`reasoning\`, or \`approach\` key
-- **Coverage (15%)** — fraction of functions attempted (key present in submission)
+| Dimension | Weight | Description |
+|---|---|---|
+| Correctness | 70% | Exact match on every expected output across all function test cases |
+| Speed | 15% | Faster submissions score higher (linear decay over 120s) |
+| Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key |
+| Coverage | 5% | Fraction of functions attempted with non-empty output arrays |
 
 ## Constraints
 - Time limit: 120 seconds
@@ -107,6 +123,37 @@ export const reefRefactorModule: ChallengeModule = {
       });
     }
 
+    // Check output array lengths to catch partial per-function answers
+    const expectedLengths = new Map(gt.functions.map(f => [f.id, f.correct_outputs.length]));
+    for (const id of expectedIds) {
+      const val = submission[id];
+      if (!Array.isArray(val)) continue;
+      const expectedLen = expectedLengths.get(id) ?? 0;
+      if (val.length !== expectedLen) {
+        warnings.push({
+          severity: "warning",
+          field: id,
+          message: `Function "${id}" expects ${expectedLen} outputs, but received ${val.length}. Missing outputs are scored as incorrect.`,
+        });
+      }
+    }
+
+    const methodText = [submission.methodology, submission.reasoning, submission.approach]
+      .find((v) => typeof v === "string" && v.trim().length > 0) as string | undefined;
+    if (!methodText) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `No methodology text found. Add a substantive "methodology" string to earn methodology points.`,
+      });
+    } else if (methodText.trim().length < 40) {
+      warnings.push({
+        severity: "warning",
+        field: "methodology",
+        message: `Methodology text is very short (${methodText.trim().length} chars). Provide a concrete approach description for full methodology credit.`,
+      });
+    }
+
     return warnings;
   },
 
@@ -117,8 +164,8 @@ export const reefRefactorModule: ChallengeModule = {
       files[`functions/${fn.id}.json`] = JSON.stringify({
         id: fn.id,
         name: fn.name,
+        description: fn.description,
         code: fn.code,
-        bug_description: fn.bug_description,
         test_cases: fn.test_cases.map(tc => ({ input: tc.input })),
       }, null, 2);
     }

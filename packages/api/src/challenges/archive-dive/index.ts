@@ -7,12 +7,33 @@ import type { ArchiveGroundTruth } from "./data.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Archive Dive
 
 ## Objective
-A corpus of documents spanning history, trade, and politics of underwater cities.
-Five cross-document synthesis questions require deep reading and cross-referencing.
+A corpus of 16 historical documents spanning history, trade, and politics of underwater
+cities. Documents include formal chronicles, personal journals, official reports,
+scholarly analyses, and oral testimonies — representing both primary and secondary
+sources. Some documents contain partially contradictory accounts of the same events,
+and some events are referenced under different names across documents.
+
+Ten cross-document synthesis questions require deep reading, cross-referencing,
+contradiction detection, and source evaluation.
 
 ## Workspace Contents
-- \`documents/\` — 10 multi-page text documents (named \`doc-{seed}-1.txt\` through \`doc-{seed}-10.txt\`)
-- \`questions.json\` — 5 synthesis questions with IDs like \`"q-{seed}-1"\` through \`"q-{seed}-5"\`
+- \`documents/\` — 16 multi-page text documents (named \`doc-{seed}-1.txt\` through \`doc-{seed}-16.txt\`)
+- \`questions.json\` — 10 synthesis questions with IDs \`"q-{seed}-1"\` through \`"q-{seed}-10"\`
+
+Each document header includes its source type (primary or secondary).
+
+## Question Types
+| Type | Description |
+|------|-------------|
+| comparison | Compare events across multiple documents |
+| timeline | Order events chronologically from scattered sources |
+| cause_effect | Trace causal chains across documents |
+| entity_tracking | Track a figure's role across multiple documents |
+| contradiction | Identify where documents disagree on facts |
+| cross_reference | Find the same event referenced under different names |
+| source_classification | Distinguish primary from secondary sources |
+| synthesis | Combine information from 3+ documents |
+| source_evaluation | Assess reliability of different source types |
 
 ## Submission Format
 
@@ -25,15 +46,9 @@ citations using \`_evidence\` suffixed keys.
   "answer": {
     "q-{seed}-1": "Your synthesis answer to question 1...",
     "q-{seed}-2": "Your synthesis answer to question 2...",
-    "q-{seed}-3": "Your synthesis answer to question 3...",
-    "q-{seed}-4": "Your synthesis answer to question 4...",
-    "q-{seed}-5": "Your synthesis answer to question 5...",
     "q-{seed}-1_evidence": [
       { "doc_id": "doc-{seed}-1", "page": 0 },
       { "doc_id": "doc-{seed}-3", "page": 2 }
-    ],
-    "q-{seed}-2_evidence": [
-      { "doc_id": "doc-{seed}-2", "page": 0 }
     ]
   }
 }
@@ -50,7 +65,7 @@ partial credit if your answer text mentions document IDs (e.g. "doc-{seed}-1").
 | **Accuracy** | 45% | Word overlap + key-term coverage against ground truth answers |
 | **Comprehensiveness** | 25% | Structured evidence citations (\`_evidence\` keys) or doc ID mentions |
 | **Speed** | 15% | Time to submission relative to 300 s limit |
-| **Citations** | 15% | Whether each answer has supporting evidence or doc references |
+| **Citations** | 15% | Quality and correctness of evidence citations (\`doc_id\` + page), with minor credit for unstructured doc mentions |
 
 ## Constraints
 - Time limit: 300 seconds
@@ -134,6 +149,45 @@ export const archiveDiveModule: ChallengeModule = {
       });
     }
 
+    // Check answer value types for common nesting mistakes
+    for (const id of found) {
+      const value = submission[id];
+      if (value !== null && typeof value === "object") {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Value for "${id}" is an object, but expected a flat string answer. Submit plain text directly, e.g. "${id}": "your synthesis answer".`,
+        });
+      }
+    }
+
+    // Validate evidence shape when provided
+    for (const id of found) {
+      const evidenceKey = `${id}_evidence`;
+      const evidence = submission[evidenceKey];
+      if (evidence === undefined) continue;
+      if (!Array.isArray(evidence)) {
+        warnings.push({
+          severity: "error",
+          field: evidenceKey,
+          message: `Value for "${evidenceKey}" must be an array like [{ "doc_id": "doc-...", "page": 0 }].`,
+        });
+        continue;
+      }
+      const badEvidenceItem = evidence.find((item) => {
+        if (!item || typeof item !== "object") return true;
+        const cite = item as Record<string, unknown>;
+        return typeof cite.doc_id !== "string" || typeof cite.page !== "number";
+      });
+      if (badEvidenceItem !== undefined) {
+        warnings.push({
+          severity: "warning",
+          field: evidenceKey,
+          message: `Some items in "${evidenceKey}" are missing "doc_id" (string) or "page" (number). Invalid citations won't earn citation credit.`,
+        });
+      }
+    }
+
     return warnings;
   },
 
@@ -142,7 +196,8 @@ export const archiveDiveModule: ChallengeModule = {
     const files: Record<string, string> = {};
     for (const doc of data.documents) {
       const content = doc.pages.map((p, i) => `--- Page ${i + 1} ---\n${p}`).join("\n\n");
-      files[`documents/${doc.id}.txt`] = `# ${doc.title}\n\n${content}`;
+      const header = `# ${doc.title}\nAuthor: ${doc.author}\nSource Type: ${doc.sourceType}\n`;
+      files[`documents/${doc.id}.txt`] = `${header}\n${content}`;
     }
     files["questions.json"] = JSON.stringify(data.questions, null, 2);
     return files;

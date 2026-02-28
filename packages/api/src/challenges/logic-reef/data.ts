@@ -24,28 +24,141 @@ export interface LogicData {
   objective: string;
 }
 
-// ── Puzzle generators ──────────────────────────────────────────────
+const ENTITIES = [
+  "crab", "octopus", "shark", "eel", "starfish", "seahorse",
+  "jellyfish", "turtle", "dolphin", "ray", "lobster", "nautilus",
+];
+const COLORS = ["red", "blue", "green", "gold", "silver", "purple", "coral", "teal", "amber", "ivory"];
+const ZONES = [
+  "north reef", "south reef", "deep trench", "coral garden",
+  "tidal pool", "kelp forest", "lava vent", "sand flat",
+  "twilight zone", "barrier ridge",
+];
+const ROLES = ["scout", "guard", "healer", "builder", "elder", "hunter", "navigator", "artisan"];
 
-const CREATURES = ["crab", "octopus", "shark", "eel", "starfish", "seahorse", "jellyfish", "turtle"];
-const COLORS = ["red", "blue", "green", "gold", "silver", "purple"];
-const LOCATIONS = ["north reef", "south reef", "deep trench", "coral garden", "tidal pool", "kelp forest"];
-
-function generatePropositionalPuzzle(seed: number, rng: () => number, difficulty: number, idx: number): {
-  puzzle: LogicPuzzle;
-  truth: LogicGroundTruth["puzzles"][0];
-} {
-  const pick = <T>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
-  const creatures = [...CREATURES];
-  for (let i = creatures.length - 1; i > 0; i--) {
+function shuffle<T>(arr: T[], rng: () => number): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [creatures[i], creatures[j]] = [creatures[j], creatures[i]];
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// Generate a hard CSP puzzle: assign attributes to N entities under constraints
+function generateHardCSP(
+  seed: number, rng: () => number, idx: number
+): { puzzle: LogicPuzzle; truth: LogicGroundTruth["puzzles"][0] } {
+  const n = 5 + Math.floor(rng() * 3); // 5-7 entities
+  const entities = shuffle(ENTITIES, rng).slice(0, n);
+  const colors = shuffle(COLORS, rng).slice(0, n);
+  const zones = shuffle(ZONES, rng).slice(0, n);
+
+  // Create the ground truth assignment
+  const colorAssign: Record<string, string> = {};
+  const zoneAssign: Record<string, string> = {};
+  for (let i = 0; i < n; i++) {
+    colorAssign[entities[i]] = colors[i];
+    zoneAssign[entities[i]] = zones[i];
   }
 
-  const a = creatures[0];
-  const b = creatures[1];
-  const c = creatures[2];
-  const loc1 = pick(LOCATIONS);
-  const loc2 = pick(LOCATIONS.filter((l) => l !== loc1));
+  const premises: string[] = [];
+
+  // Direct clues (give 2-3)
+  const directCount = 2 + Math.floor(rng() * 2);
+  const directIndices = shuffle(Array.from({ length: n }, (_, i) => i), rng).slice(0, directCount);
+  for (const di of directIndices) {
+    if (rng() > 0.5) {
+      premises.push(`The ${entities[di]} is ${colorAssign[entities[di]]}.`);
+    } else {
+      premises.push(`The ${entities[di]} lives in the ${zoneAssign[entities[di]]}.`);
+    }
+  }
+
+  // Negative clues (4-6): entity is NOT a color/zone
+  for (let i = 0; i < n; i++) {
+    if (directIndices.includes(i)) continue;
+    const wrongColor = colors[(i + 2) % n];
+    premises.push(`The ${entities[i]} is NOT ${wrongColor}.`);
+    if (rng() > 0.4) {
+      const wrongZone = zones[(i + 3) % n];
+      premises.push(`The ${entities[i]} does NOT live in the ${wrongZone}.`);
+    }
+  }
+
+  // Relational clues (2-3)
+  for (let k = 0; k < 2 + Math.floor(rng() * 2); k++) {
+    const i = Math.floor(rng() * n);
+    const j = (i + 1 + Math.floor(rng() * (n - 1))) % n;
+    if (rng() > 0.5) {
+      premises.push(`The creature in the ${zoneAssign[entities[i]]} is ${colorAssign[entities[i]]}.`);
+    } else {
+      premises.push(`The ${colorAssign[entities[j]]} creature lives in the ${zoneAssign[entities[j]]}.`);
+    }
+  }
+
+  // Conditional clues (1-2)
+  const ci = Math.floor(rng() * n);
+  const cj = (ci + 1) % n;
+  premises.push(
+    `If any creature is ${colorAssign[entities[ci]]}, then it lives in the ${zoneAssign[entities[ci]]}.`
+  );
+  if (rng() > 0.5) {
+    premises.push(
+      `If any creature lives in the ${zoneAssign[entities[cj]]}, then it is NOT ${colors[(cj + 2) % n]}.`
+    );
+  }
+
+  // Distractor premises (true but unhelpful)
+  premises.push(`There are exactly ${n} creatures in the reef.`);
+  if (rng() > 0.5) {
+    premises.push(`At least one creature is either ${colors[0]} or ${colors[1]}.`);
+  }
+
+  const rules = [
+    `Each creature has exactly one color and one zone.`,
+    `All ${n} colors are used exactly once: ${colors.join(", ")}.`,
+    `All ${n} zones are used exactly once: ${zones.join(", ")}.`,
+  ];
+
+  // Pick a target that's NOT directly given
+  const nonDirect = Array.from({ length: n }, (_, i) => i).filter(i => !directIndices.includes(i));
+  const targetIdx = nonDirect[Math.floor(rng() * nonDirect.length)] ?? 0;
+  const askColor = rng() > 0.5;
+  const question = askColor
+    ? `What color is the ${entities[targetIdx]}?`
+    : `Where does the ${entities[targetIdx]} live?`;
+  const answer = askColor ? colorAssign[entities[targetIdx]] : zoneAssign[entities[targetIdx]];
+
+  const assignStr = entities.map(e => `${e}: ${colorAssign[e]}, ${zoneAssign[e]}`).join("; ");
+
+  return {
+    puzzle: {
+      id: `logic-${seed}-csp-${idx}`,
+      type: "constraint",
+      difficulty: n,
+      premises: shuffle(premises, rng),
+      rules,
+      question,
+    },
+    truth: {
+      id: `logic-${seed}-csp-${idx}`,
+      answer,
+      reasoning: `Full assignment: ${assignStr}`,
+      minimal_steps: n - directCount,
+    },
+  };
+}
+
+// Generate a multi-step propositional logic puzzle
+function generateHardPropositional(
+  seed: number, rng: () => number, idx: number
+): { puzzle: LogicPuzzle; truth: LogicGroundTruth["puzzles"][0] } {
+  const entities = shuffle(ENTITIES, rng).slice(0, 6);
+  const locs = shuffle(ZONES, rng).slice(0, 6);
+  const roles = shuffle(ROLES, rng).slice(0, 4);
+
+  const variant = Math.floor(rng() * 4);
 
   let premises: string[];
   let rules: string[];
@@ -54,48 +167,76 @@ function generatePropositionalPuzzle(seed: number, rng: () => number, difficulty
   let reasoning: string;
   let minSteps: number;
 
-  if (difficulty <= 2) {
-    // Simple: if P then Q, P, therefore Q (modus ponens)
+  if (variant === 0) {
+    // 5-step chain with a branch and negation
     premises = [
-      `If the ${a} is in the ${loc1}, then the ${b} is in the ${loc2}.`,
-      `The ${a} is in the ${loc1}.`,
+      `The ${entities[0]} is a ${roles[0]}.`,
+      `If any creature is a ${roles[0]}, it lives in the ${locs[0]}.`,
+      `If any creature lives in the ${locs[0]}, it is allied with the ${entities[1]}.`,
+      `If any creature is allied with the ${entities[1]}, the ${entities[2]} moves to the ${locs[2]}.`,
+      `If the ${entities[2]} is in the ${locs[2]}, then the ${entities[3]} is NOT in the ${locs[3]}.`,
+      `If the ${entities[3]} is NOT in the ${locs[3]}, the ${entities[3]} is in the ${locs[4]}.`,
+      `The ${entities[4]} is a ${roles[1]}.`, // distractor
     ];
-    rules = ["Apply modus ponens to determine where creatures are located."];
-    question = `Is the ${b} in the ${loc2}?`;
-    answer = true;
-    reasoning = `Since the ${a} is in the ${loc1} (premise 2), and if ${a} is in ${loc1} then ${b} is in ${loc2} (premise 1), therefore ${b} is in ${loc2}.`;
-    minSteps = 1;
-  } else if (difficulty === 3) {
-    // Chain: if P→Q, Q→R, P, therefore R
-    const loc3 = pick(LOCATIONS.filter((l) => l !== loc1 && l !== loc2));
+    rules = ["Apply the chain of implications step by step. Some premises are distractors."];
+    question = `Where is the ${entities[3]}?`;
+    answer = locs[4];
+    reasoning = `${entities[0]} is ${roles[0]} -> lives in ${locs[0]} -> allied with ${entities[1]} -> ${entities[2]} moves to ${locs[2]} -> ${entities[3]} NOT in ${locs[3]} -> ${entities[3]} in ${locs[4]}`;
+    minSteps = 5;
+  } else if (variant === 1) {
+    // Disjunction elimination
     premises = [
-      `If the ${a} is in the ${loc1}, then the ${b} is in the ${loc2}.`,
-      `If the ${b} is in the ${loc2}, then the ${c} is in the ${loc3}.`,
-      `The ${a} is in the ${loc1}.`,
+      `Either the ${entities[0]} is in the ${locs[0]} or the ${entities[1]} is in the ${locs[1]}.`,
+      `If the ${entities[0]} is in the ${locs[0]}, then the ${entities[2]} is a ${roles[0]}.`,
+      `If the ${entities[1]} is in the ${locs[1]}, then the ${entities[2]} is a ${roles[0]}.`,
+      `The ${entities[0]} is NOT in the ${locs[0]}.`,
+      `If the ${entities[2]} is a ${roles[0]}, then the ${entities[3]} is in the ${locs[3]}.`,
+      `If the ${entities[3]} is in the ${locs[3]}, then the ${entities[4]} is NOT a ${roles[1]}.`,
+      `The ${entities[5]} is a ${roles[2]}.`, // distractor
     ];
-    rules = ["Chain implications to find the final location."];
-    question = `Where is the ${c}?`;
-    answer = loc3;
-    reasoning = `${a} in ${loc1} → ${b} in ${loc2} → ${c} in ${loc3}. By chaining the two implications.`;
-    minSteps = 2;
-  } else {
-    // Contrapositive: if P→Q, not Q, therefore not P
-    premises = [
-      `If the ${a} is in the ${loc1}, then the ${b} is in the ${loc2}.`,
-      `The ${b} is NOT in the ${loc2}.`,
-    ];
-    rules = ["Use contrapositive reasoning (if P→Q and not Q, then not P)."];
-    question = `Is the ${a} in the ${loc1}?`;
+    rules = ["Use disjunction elimination and chaining to derive the answer."];
+    question = `Is the ${entities[4]} a ${roles[1]}?`;
     answer = false;
-    reasoning = `By contrapositive: if ${a} in ${loc1} → ${b} in ${loc2}, and ${b} is NOT in ${loc2}, then ${a} is NOT in ${loc1}.`;
-    minSteps = 1;
+    reasoning = `${entities[0]} NOT in ${locs[0]}, so by disjunction ${entities[1]} in ${locs[1]} -> ${entities[2]} is ${roles[0]} -> ${entities[3]} in ${locs[3]} -> ${entities[4]} NOT ${roles[1]}`;
+    minSteps = 4;
+  } else if (variant === 2) {
+    // Double negation + contrapositive
+    premises = [
+      `If the ${entities[0]} is in the ${locs[0]}, then the ${entities[1]} is in the ${locs[1]}.`,
+      `If the ${entities[1]} is in the ${locs[1]}, then the ${entities[2]} is a ${roles[0]}.`,
+      `The ${entities[2]} is NOT a ${roles[0]}.`,
+      `If the ${entities[0]} is NOT in the ${locs[0]}, then the ${entities[3]} is in the ${locs[2]}.`,
+      `If the ${entities[3]} is in the ${locs[2]}, then the ${entities[4]} is in the ${locs[3]}.`,
+      `It is false that the ${entities[5]} is a ${roles[1]}.`, // distractor
+    ];
+    rules = ["Use contrapositive reasoning and forward chaining."];
+    question = `Where is the ${entities[4]}?`;
+    answer = locs[3];
+    reasoning = `${entities[2]} NOT ${roles[0]} -> (contrapositive) ${entities[1]} NOT in ${locs[1]} -> ${entities[0]} NOT in ${locs[0]} -> ${entities[3]} in ${locs[2]} -> ${entities[4]} in ${locs[3]}`;
+    minSteps = 4;
+  } else {
+    // Biconditional + elimination
+    premises = [
+      `The ${entities[0]} is in the ${locs[0]} if and only if the ${entities[1]} is a ${roles[0]}.`,
+      `The ${entities[1]} is a ${roles[0]}.`,
+      `If the ${entities[0]} is in the ${locs[0]}, then either the ${entities[2]} is in the ${locs[1]} or the ${entities[3]} is in the ${locs[2]}.`,
+      `The ${entities[2]} is NOT in the ${locs[1]}.`,
+      `If the ${entities[3]} is in the ${locs[2]}, then the ${entities[4]} has the role of ${roles[1]}.`,
+      `If the ${entities[4]} is a ${roles[1]}, then the ${entities[5]} is in the ${locs[3]}.`,
+      `No creature can be in more than one zone simultaneously.`, // rule/distractor
+    ];
+    rules = ["Apply biconditional elimination, disjunctive syllogism, and forward chaining."];
+    question = `Where is the ${entities[5]}?`;
+    answer = locs[3];
+    reasoning = `${entities[1]} is ${roles[0]} -> (biconditional) ${entities[0]} in ${locs[0]} -> either ${entities[2]} in ${locs[1]} OR ${entities[3]} in ${locs[2]} -> ${entities[2]} NOT in ${locs[1]} so ${entities[3]} in ${locs[2]} -> ${entities[4]} is ${roles[1]} -> ${entities[5]} in ${locs[3]}`;
+    minSteps = 5;
   }
 
   return {
     puzzle: {
       id: `logic-${seed}-prop-${idx}`,
       type: "propositional",
-      difficulty,
+      difficulty: minSteps,
       premises,
       rules,
       question,
@@ -109,102 +250,32 @@ function generatePropositionalPuzzle(seed: number, rng: () => number, difficulty
   };
 }
 
-function generateConstraintPuzzle(seed: number, rng: () => number, difficulty: number, idx: number): {
-  puzzle: LogicPuzzle;
-  truth: LogicGroundTruth["puzzles"][0];
-} {
-  const pick = <T>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
-  const randInt = (min: number, max: number) => Math.floor(rng() * (max - min + 1)) + min;
-
-  const creatures = [...CREATURES];
-  for (let i = creatures.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [creatures[i], creatures[j]] = [creatures[j], creatures[i]];
-  }
-
-  const colors = [...COLORS];
-  for (let i = colors.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [colors[i], colors[j]] = [colors[j], colors[i]];
-  }
-
-  // Constraint satisfaction: assign colors to creatures with constraints
-  const n = difficulty <= 2 ? 3 : difficulty <= 3 ? 4 : 5;
-  const selected = creatures.slice(0, n);
-  const selectedColors = colors.slice(0, n);
-
-  // Generate a valid assignment
-  const assignment: Record<string, string> = {};
-  for (let i = 0; i < n; i++) {
-    assignment[selected[i]] = selectedColors[i];
-  }
-
-  // Generate constraints from the assignment
-  const premises: string[] = [];
-  const constraints: string[] = [];
-
-  // Direct assignment clue for first creature
-  premises.push(`The ${selected[0]} is ${assignment[selected[0]]}.`);
-
-  // "Not" constraints
-  for (let i = 1; i < n; i++) {
-    const wrongColor = selectedColors[(i + 1) % n];
-    premises.push(`The ${selected[i]} is NOT ${wrongColor}.`);
-  }
-
-  // Relational constraint
-  if (n >= 3) {
-    premises.push(`The ${selected[1]} is the same color as: one of ${selectedColors.filter((c) => c === assignment[selected[1]]).concat(selectedColors.filter((c) => c !== assignment[selected[1]]).slice(0, 1)).join(" or ")}.`);
-  }
-
-  // Unique constraint
-  constraints.push("Each creature has a unique color.");
-  constraints.push(`Available colors: ${selectedColors.join(", ")}.`);
-
-  const targetIdx = randInt(1, n - 1);
-  const question = `What color is the ${selected[targetIdx]}?`;
-
-  return {
-    puzzle: {
-      id: `logic-${seed}-csp-${idx}`,
-      type: "constraint",
-      difficulty,
-      premises,
-      rules: constraints,
-      question,
-    },
-    truth: {
-      id: `logic-${seed}-csp-${idx}`,
-      answer: assignment[selected[targetIdx]],
-      reasoning: `By elimination: ${Object.entries(assignment).map(([k, v]) => `${k}=${v}`).join(", ")}`,
-      minimal_steps: n - 1,
-    },
-  };
-}
-
 export function generateLogicData(seed: number): LogicData {
   const rng = mulberry32(seed);
 
   const results: Array<{ puzzle: LogicPuzzle; truth: LogicGroundTruth["puzzles"][0] }> = [];
 
-  // 6 puzzles: 3 propositional (easy/medium/hard), 3 constraint (easy/medium/hard)
-  results.push(generatePropositionalPuzzle(seed, rng, 1, 0));
-  results.push(generatePropositionalPuzzle(seed, rng, 3, 1));
-  results.push(generatePropositionalPuzzle(seed, rng, 4, 2));
-  results.push(generateConstraintPuzzle(seed, rng, 2, 0));
-  results.push(generateConstraintPuzzle(seed, rng, 3, 1));
-  results.push(generateConstraintPuzzle(seed, rng, 5, 2));
+  // 8 puzzles: 4 propositional, 4 CSP
+  for (let i = 0; i < 4; i++) {
+    results.push(generateHardPropositional(seed, rng, i));
+  }
+  for (let i = 0; i < 4; i++) {
+    results.push(generateHardCSP(seed, rng, i));
+  }
 
   const puzzleIds = results.map(r => r.puzzle.id);
   const objective =
-    "Solve all 6 logic puzzles. Three are propositional logic (modus ponens, chain reasoning, contrapositive). " +
-    "Three are constraint satisfaction (assign colors to creatures under constraints). " +
-    `Submit each answer as a flat value keyed by puzzle ID — e.g. { "${puzzleIds[0]}": true, "${puzzleIds[3]}": "blue" }. ` +
+    "Solve all 8 logic puzzles. Four are propositional logic requiring multi-step " +
+    "deduction chains (5+ steps involving chaining, contrapositive, disjunction elimination, " +
+    "and biconditional reasoning). Four are constraint satisfaction with 5-7 variables, " +
+    "two attribute dimensions, and constraints including negation, conditionals, and " +
+    "relational clues. Some premises are distractors. " +
+    `Submit each answer keyed by puzzle ID — e.g. { "${puzzleIds[0]}": "answer", ... }. ` +
     "Include a top-level 'reasoning' key for bonus points.";
 
   return {
-    puzzles: results.map((r) => r.puzzle),
-    groundTruth: { puzzles: results.map((r) => r.truth) },
+    puzzles: results.map(r => r.puzzle),
+    groundTruth: { puzzles: results.map(r => r.truth) },
     objective,
   };
 }

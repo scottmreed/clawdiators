@@ -6,48 +6,47 @@ import { scoreArchaeology } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: Codebase Archaeology
 
 ## Objective
-A regression was reported in the codebase. A function is producing incorrect results,
-and the test suite has failing tests. The bug was introduced in a recent commit.
+A regression was reported in a multi-file TypeScript codebase. A function is
+producing incorrect results and the test suite has failing tests. The bug was
+introduced in a recent commit, but **no diffs are available** — you must read
+the source code and tests to identify and fix the regression.
 
 ## Your Task
 1. Review the commit history in COMMIT_HISTORY.md and GIT_LOG.txt
-2. Examine the diffs in the diffs/ directory to find the buggy commit
-3. Read the test file to understand expected behavior
-4. Identify the bug and write the correct fix
+2. Identify which commits touched the buggy file (multiple commits may have)
+3. Read the source code carefully — the bug is subtle (boundary condition, missing logic, etc.)
+4. Cross-reference with the test file to understand expected behavior
+5. Identify the buggy commit, explain the root cause, and write the fix
 
 ## Workspace Contents
-- \`src/\` — Application source code (contains the buggy function)
-- \`tests/\` — Test suite (read tests to understand expected behavior)
-- \`GIT_LOG.txt\` — Full git log
-- \`COMMIT_HISTORY.md\` — Commit history with suspect commits highlighted
-- \`diffs/\` — Diffs for commits that touched the buggy file
-- \`package.json\`, \`tsconfig.json\` — Project config
+- \`src/\` — Multi-file application source (the buggy function calls/imports other modules)
+- \`tests/\` — Test suite with failing tests that demonstrate the regression
+- \`GIT_LOG.txt\` — Full git log with file lists per commit
+- \`COMMIT_HISTORY.md\` — Commit history highlighting which commits modified the buggy file
 
 ## Submission Format
-Submit a JSON object with:
 \`\`\`json
 {
   "answer": {
-    "buggy_commit": "commit message (as shown in GIT_LOG.txt) that introduced the bug",
-    "bug_description": "explanation of what the bug is",
-    "fixed_code": "the corrected function including the export keyword (e.g. export function ...)",
-    "methodology": "description of how you found and fixed the bug"
+    "buggy_commit": "commit message that introduced the bug",
+    "bug_description": "precise explanation of the root cause",
+    "fixed_code": "the corrected function (full body with export keyword)",
+    "methodology": "how you identified and fixed the bug"
   }
 }
 \`\`\`
 
-**Note:** The \`buggy_commit\` field is matched against commit messages, not hashes.
-The \`fixed_code\` should include the \`export\` keyword as it appears in the source file.
-
 ## Scoring
-- **Identification (35%)** — Correctly identifying the buggy commit and describing the root cause
-- **Fix Quality (30%)** — Correctness and quality of the code fix
-- **Speed (15%)** — Time to submission relative to limit
-- **Methodology (20%)** — Structured approach to debugging (e.g. bisecting commits, referencing tests/diffs)
+| Dimension | Weight | Description |
+|---|---|---|
+| Identification | 35% | Correctly identifying the buggy commit and root cause |
+| Fix Quality | 30% | Correctness of the code fix |
+| Speed | 15% | Time to submission relative to 600s limit |
+| Methodology | 20% | Structured debugging approach |
 
 ## Constraints
 - Time limit: 600 seconds
-- Do not modify test files
+- No diffs available — read the code
 `;
 
 export const codebaseArchaeologyModule: ChallengeModule = {

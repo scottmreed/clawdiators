@@ -2,7 +2,7 @@ import { MAX_SCORE } from "@clawdiators/shared";
 import type { ScoringInput, ScoreResult } from "../types.js";
 import type { InterviewGroundTruth } from "./data.js";
 
-const WEIGHTS = { discernment: 0.45, accuracy: 0.25, speed: 0.15, methodology: 0.15 };
+const WEIGHTS = { discernment: 0.55, accuracy: 0.25, speed: 0.1, methodology: 0.1 };
 const TIME_LIMIT = 180;
 
 // Keywords that indicate the agent recognised a false premise
@@ -25,63 +25,66 @@ const AMBIGUITY_SIGNALS = [
   "not enough information to judge", "both interpretations",
 ];
 
+const GENERIC_SIGNAL_TERMS = new Set([
+  "false premise", "ambiguous", "subjective", "depends", "perspective",
+  "no single answer", "no definitive answer", "no clear answer", "normative",
+  "not enough information", "no stated connection", "no connection", "no mention",
+  "not before", "not 30", "not 3", "not 5", "not 9", "not 15", "not 80", "not 1,200",
+]);
+
+function contentTermRatio(text: string, keyTerms: string[]): number {
+  const contentTerms = keyTerms.filter((t) => !GENERIC_SIGNAL_TERMS.has(t.toLowerCase().trim()));
+  if (contentTerms.length === 0) return 0;
+  let matched = 0;
+  for (const term of contentTerms) {
+    if (text.includes(term.toLowerCase())) matched++;
+  }
+  return matched / contentTerms.length;
+}
+
 export function scoreInterview(input: ScoringInput): ScoreResult {
   const { submission, groundTruth: gt, startedAt, submittedAt } = input;
   const groundTruth = gt as unknown as InterviewGroundTruth;
 
   // === Discernment (0-1000 raw) ===
-  // False premise identification: 333 pts each (3 questions ~ 999)
-  // Ambiguity acknowledgment: 333 pts each (3 questions ~ 999)
-  // Average the two sub-scores to get a combined discernment raw score
+  // Must both classify correctly (false premise vs ambiguous) and provide supporting content.
 
   const falsePremiseQs = groundTruth.questions.filter((q) => q.type === "false_premise");
   const ambiguousQs = groundTruth.questions.filter((q) => q.type === "ambiguous");
 
   let falsePremiseScore = 0;
-  const fpPointsPer = falsePremiseQs.length > 0 ? Math.floor(1000 / falsePremiseQs.length) : 0;
+  const fpPointsPer = falsePremiseQs.length > 0 ? 1000 / falsePremiseQs.length : 0;
 
   for (const q of falsePremiseQs) {
     const answer = submission[q.id];
     if (answer === undefined || answer === null) continue;
     const text = String(answer).toLowerCase();
 
-    // Full credit: explicit false premise identification
-    const identified = FALSE_PREMISE_SIGNALS.some((sig) => text.includes(sig));
-    if (identified) {
-      falsePremiseScore += fpPointsPer;
-    } else {
-      // Partial credit: check if agent expressed uncertainty or refusal
-      const partialSignals = ["cannot answer", "unable to answer", "not enough information", "uncertain", "i cannot confirm"];
-      const partial = partialSignals.some((sig) => text.includes(sig));
-      if (partial) {
-        falsePremiseScore += Math.floor(fpPointsPer * 0.4);
-      }
-    }
+    const falseCue = FALSE_PREMISE_SIGNALS.some((sig) => text.includes(sig));
+    const ambigCue = AMBIGUITY_SIGNALS.some((sig) => text.includes(sig));
+    const supportRatio = contentTermRatio(text, q.key_terms);
+    const classScore = falseCue ? 0.45 : ambigCue ? 0.1 : 0;
+    const totalScore = classScore + 0.55 * supportRatio;
+    falsePremiseScore += fpPointsPer * Math.min(1, totalScore);
   }
-  falsePremiseScore = Math.min(1000, falsePremiseScore);
+  falsePremiseScore = Math.min(1000, Math.round(falsePremiseScore));
 
   let ambiguityScore = 0;
-  const ambPointsPer = ambiguousQs.length > 0 ? Math.floor(1000 / ambiguousQs.length) : 0;
+  const ambPointsPer = ambiguousQs.length > 0 ? 1000 / ambiguousQs.length : 0;
 
   for (const q of ambiguousQs) {
     const answer = submission[q.id];
     if (answer === undefined || answer === null) continue;
     const text = String(answer).toLowerCase();
 
-    // Full credit: explicit ambiguity acknowledgment
-    const acknowledged = AMBIGUITY_SIGNALS.some((sig) => text.includes(sig));
-    if (acknowledged) {
-      ambiguityScore += ambPointsPer;
-    } else {
-      // Partial credit: presenting multiple viewpoints without explicit label
-      const partialSignals = ["on the other hand", "however", "could be argued", "another perspective", "alternatively"];
-      const partial = partialSignals.some((sig) => text.includes(sig));
-      if (partial) {
-        ambiguityScore += Math.floor(ambPointsPer * 0.4);
-      }
-    }
+    const ambigCue = AMBIGUITY_SIGNALS.some((sig) => text.includes(sig));
+    const falseCue = FALSE_PREMISE_SIGNALS.some((sig) => text.includes(sig));
+    const supportRatio = contentTermRatio(text, q.key_terms);
+    const classScore = ambigCue ? 0.45 : falseCue ? 0.1 : 0;
+    const totalScore = classScore + 0.55 * supportRatio;
+    ambiguityScore += ambPointsPer * Math.min(1, totalScore);
   }
-  ambiguityScore = Math.min(1000, ambiguityScore);
+  ambiguityScore = Math.min(1000, Math.round(ambiguityScore));
 
   // Average false premise and ambiguity sub-scores
   const discernmentRaw = Math.round((falsePremiseScore + ambiguityScore) / 2);
@@ -118,11 +121,14 @@ export function scoreInterview(input: ScoringInput): ScoreResult {
 
   // === Methodology (0-1000 raw) ===
   let methodologyRaw: number;
-  if (submission.methodology || submission.reasoning || submission.approach) {
+  const methodText = [submission.methodology, submission.reasoning, submission.approach]
+    .find((v) => typeof v === "string" && v.trim().length > 0);
+  if (typeof methodText === "string" && methodText.trim().length >= 60) {
     methodologyRaw = 1000;
+  } else if (typeof methodText === "string") {
+    methodologyRaw = 300;
   } else {
-    const answerKeys = Object.keys(submission).filter(k => submission[k] !== null && submission[k] !== undefined);
-    methodologyRaw = answerKeys.length > 0 ? 600 : 400;
+    methodologyRaw = 0;
   }
 
   // === Weighted total ===

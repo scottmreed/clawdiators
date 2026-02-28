@@ -2,7 +2,7 @@ import { MAX_SCORE } from "@clawdiators/shared";
 import type { ScoringInput, ScoreResult } from "../types.js";
 import type { MirageGroundTruth } from "./data.js";
 
-const WEIGHTS = { detection: 0.4, precision: 0.25, speed: 0.15, thoroughness: 0.2 };
+const WEIGHTS = { detection: 0.55, precision: 0.3, speed: 0.1, thoroughness: 0.05 };
 const TIME_LIMIT = 240;
 
 export function scoreMirage(input: ScoringInput): ScoreResult {
@@ -35,12 +35,12 @@ export function scoreMirage(input: ScoringInput): ScoreResult {
       const truthField = truth.field.toLowerCase().trim();
       const truthSource = truth.source.toLowerCase().trim();
 
-      // Match by district + field OR district + source overlap
+      // Strict match by district + field; source must be correct when provided.
       const districtMatch = subDistrict === truthDistrict;
       const fieldMatch = subField === truthField;
       const sourceMatch = subSource === truthSource;
 
-      if (districtMatch && (fieldMatch || sourceMatch)) {
+      if (districtMatch && fieldMatch && (!subSource || sourceMatch)) {
         detectedCount++;
         matchedTruthIds.add(truth.id);
         break;
@@ -61,19 +61,24 @@ export function scoreMirage(input: ScoringInput): ScoreResult {
   const speedRaw = elapsedSecs >= TIME_LIMIT ? 0 : Math.round(1000 * (1 - elapsedSecs / TIME_LIMIT));
 
   // === Thoroughness (0-1000 raw) ===
-  let thoroughnessRaw: number;
-  const fabrications = Array.isArray(submission.fabrications) ? submission.fabrications : [];
-  // Check how many different datasets are referenced
-  const datasetsChecked = new Set<string>();
-  for (const f of fabrications) {
-    const fab = f as Record<string, unknown>;
-    if (fab.dataset) datasetsChecked.add(String(fab.dataset));
-    if (fab.source) datasetsChecked.add(String(fab.source));
+  // Count unique sources among correctly matched fabrications only.
+  const matchedSources = new Set<string>();
+  for (const sub of submitted) {
+    if (!sub.district || !sub.field) continue;
+    const subDistrict = sub.district.toLowerCase().trim();
+    const subField = sub.field.toLowerCase().trim();
+    for (const truth of groundTruth.fabrications) {
+      if (truth.district.toLowerCase().trim() === subDistrict && truth.field.toLowerCase().trim() === subField) {
+        matchedSources.add(truth.source.toLowerCase().trim());
+        break;
+      }
+    }
   }
-  if (datasetsChecked.size >= 3) thoroughnessRaw = 1000;
-  else if (datasetsChecked.size >= 2) thoroughnessRaw = 700;
-  else if (datasetsChecked.size >= 1) thoroughnessRaw = 400;
-  else thoroughnessRaw = 200;
+  let thoroughnessRaw: number;
+  if (matchedSources.size >= 3) thoroughnessRaw = 1000;
+  else if (matchedSources.size === 2) thoroughnessRaw = 600;
+  else if (matchedSources.size === 1) thoroughnessRaw = 250;
+  else thoroughnessRaw = 0;
 
   // Weighted total
   const detection = Math.round(detectionRaw * WEIGHTS.detection);

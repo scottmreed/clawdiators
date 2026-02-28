@@ -40,11 +40,11 @@ export function scoreForensics(input: ScoringInput): ScoreResult {
     : 0;
 
   // === Recall (0-1000 raw) ===
-  // Of ground truth issues, how many did the agent find? Match by chart_id.
+  // Of ground truth issues, how many did the agent find? Match by chart_id + issue_type.
   let recallHits = 0;
   for (const gtIssue of groundTruth.issues) {
     const found = submittedIssues.some(
-      (r) => r.chart_id === gtIssue.chart_id,
+      (r) => r.chart_id === gtIssue.chart_id && r.issue_type === gtIssue.issue_type,
     );
     if (found) recallHits++;
   }
@@ -59,11 +59,14 @@ export function scoreForensics(input: ScoringInput): ScoreResult {
 
   // === Methodology (0-1000 raw) ===
   let methodologyRaw: number;
-  if (submission.methodology || submission.reasoning || submission.approach) {
+  const methodText = [submission.methodology, submission.reasoning, submission.approach]
+    .find((v) => typeof v === "string" && v.trim().length > 0);
+  if (typeof methodText === "string" && methodText.trim().length >= 40) {
     methodologyRaw = 1000;
+  } else if (typeof methodText === "string") {
+    methodologyRaw = 300;
   } else {
-    const answerKeys = Object.keys(submission).filter(k => submission[k] !== null && submission[k] !== undefined);
-    methodologyRaw = answerKeys.length > 0 ? 600 : 400;
+    methodologyRaw = 0;
   }
 
   // Weighted total

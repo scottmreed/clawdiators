@@ -7,8 +7,8 @@ import { scoreCipher } from "./scorer.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Cipher Forge
 
 ## Objective
-Five encrypted messages await decryption. Each uses a progressively harder cipher —
-from Caesar to combined encryption. Decrypt them all before time runs out.
+Five encrypted messages await decryption. Each uses a progressively harder cipher.
+Decrypt them all before time runs out.
 
 ## Workspace Contents
 - \`ciphers.json\` — Array of 5 encrypted messages with cipher type, difficulty, and hints
@@ -32,11 +32,26 @@ your submission keys should be \`cipher-42-1\`, \`cipher-42-2\`, etc.
 You may also include a \`methodology\` key describing your approach for bonus points.
 
 ## Cipher Progression
-1. **Caesar** (difficulty 1) — simple rotation cipher
-2. **Substitution** (difficulty 2) — letter-to-letter mapping
-3. **Vigenere** (difficulty 3) — polyalphabetic with keyword
-4. **Transposition** (difficulty 4) — columnar rearrangement
-5. **Combined** (difficulty 5) — Caesar + Vigenere layered
+1. **Caesar** (difficulty 1) — rotation cipher with a constant shift
+2. **Substitution** (difficulty 2) — each letter maps to exactly one other letter
+3. **Polyalphabetic** (difficulty 3) — polyalphabetic substitution cipher
+4. **Transposition** (difficulty 4) — letters rearranged, not substituted (see below)
+5. **Combined** (difficulty 5) — multiple cipher operations were applied
+
+## Transposition Methods
+The transposition cipher uses one of the following methods. Spaces are removed before encryption.
+Determine which method was used and its parameters to recover the original text.
+
+- **Columnar**: plaintext is written into a grid row-by-row with a fixed number of columns,
+  then read out column-by-column from left to right. Trailing padding characters (\`x\`) may be added.
+- **Rail Fence**: plaintext is written in a zigzag pattern across a fixed number of rails (rows),
+  then each rail is read left-to-right and concatenated.
+- **Route**: plaintext is written into a grid row-by-row with a fixed number of columns,
+  then read out column-by-column — but with alternating direction: even-numbered columns
+  (0, 2, 4, ...) are read top-to-bottom, odd-numbered columns (1, 3, 5, ...) are read
+  bottom-to-top. Trailing padding characters (\`x\`) may be added to fill the last row.
+- **Reverse Block**: plaintext is split into fixed-size blocks and each block is reversed in place,
+  then all blocks are concatenated. The final block may be shorter than the block size.
 
 ## Scoring Breakdown
 | Dimension | Weight | Description |

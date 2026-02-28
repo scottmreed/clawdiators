@@ -176,74 +176,74 @@ const STRAIGHTFORWARD_POOL: QuestionTemplate[] = [
 
 const FALSE_PREMISE_POOL: QuestionTemplate[] = [
   {
-    question: "Why did the Coral Sovereignty secede from the Abyssal Capital in 400 DC?",
-    category: "politics",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. The Coral Sovereignty is described as a federation of reef-states that governs the eastern shallows — there is no record of it seceding from the Abyssal Capital.",
-    key_terms: ["false premise", "no record", "secede", "federation"],
-  },
-  {
-    question: "How many casualties resulted from the Trench Wars' use of sonar weapons?",
+    question: "After the 30-year Trench Wars ended with the Treaty of Hadal, what reparations were imposed?",
     category: "history",
     type: "false_premise",
-    correct_answer: "This question contains a false premise. While the Trench Wars are documented (530-570 DC), there is no mention of sonar weapons or casualty figures in the reference materials.",
-    key_terms: ["false premise", "no mention", "sonar weapons"],
+    correct_answer: "This question contains a false premise. The Trench Wars lasted 40 years (530-570 DC), not 30 years. The duration is subtly wrong. Additionally, no reparations are mentioned in the reference — only that the wars ended with the Treaty of Hadal.",
+    key_terms: ["false premise", "40 years", "not 30", "no mention", "reparations"],
   },
   {
-    question: "When did the Leviathan Council vote to dissolve the Kelp Dominion?",
-    category: "politics",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. There is no record of the Leviathan Council voting to dissolve the Kelp Dominion. The Council arbitrates disputes; the Kelp Dominion remains a functioning state.",
-    key_terms: ["false premise", "no record", "dissolve"],
-  },
-  {
-    question: "What was the name of the second Abyssal Capital that replaced Meridia?",
+    question: "How has the Kelp Dominion maintained its production of 80% of the world's breathable water?",
     category: "geography",
     type: "false_premise",
-    correct_answer: "This question contains a false premise. Meridia is the Abyssal Capital; there is no reference to it being replaced by a second capital.",
-    key_terms: ["false premise", "meridia", "no reference", "replaced"],
+    correct_answer: "This question contains a false premise. The Kelp Dominion produces 60% of the world's breathable water, not 80%. The question subtly inflates the actual figure.",
+    key_terms: ["false premise", "60%", "not 80"],
   },
   {
-    question: "How did the Cephalopod Engineers cause the Phosphor Plague through their experiments?",
-    category: "history",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. The Phosphor Plague of 450 DC is documented, but there is no connection stated between the Cephalopod Engineers and the plague's cause.",
-    key_terms: ["false premise", "no connection", "cephalopod engineers"],
-  },
-  {
-    question: "What percentage of Lumens are minted in the Obsidian Vents' forgeries?",
-    category: "economics",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. While the Obsidian Vents produce rare minerals (deepstone and pressurized quartz) and Lumens are the currency, there is no stated connection between the Vents and Lumen production.",
-    key_terms: ["false premise", "no stated connection", "obsidian vents", "lumen"],
-  },
-  {
-    question: "Why was the Siren Academy shut down after the Mariana Accord?",
-    category: "education",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. The Siren Academy trains navigators and the Mariana Accord established free trench passage — there is no record of the Academy being shut down.",
-    key_terms: ["false premise", "no record", "shut down"],
-  },
-  {
-    question: "How many Surface Era humans survived the descent to found Meridia?",
-    category: "history",
-    type: "false_premise",
-    correct_answer: "This question contains a false premise. Meridia was founded by the Architect Caste in 312 DC. While Sunken Relics from the Surface Era exist, there is no stated connection between Surface Era humans and Meridia's founding.",
-    key_terms: ["false premise", "architect caste", "no stated connection", "surface era"],
-  },
-  {
-    question: "What treaty ended the war between the Pelagic Nomads and the Benthic Farmers?",
+    question: "Given that the 15 elder creatures on the Leviathan Council each represent a different nation, which nation lacks representation?",
     category: "politics",
     type: "false_premise",
-    correct_answer: "This question contains a false premise. While both the Pelagic Nomads and Benthic Farms are documented, there is no record of a war between them.",
-    key_terms: ["false premise", "no record", "war"],
+    correct_answer: "This question contains a false premise. The Leviathan Council consists of 12 elder creatures, not 15. The question subtly changes the number and builds further assumptions on that false fact.",
+    key_terms: ["false premise", "12", "not 15"],
   },
   {
-    question: "How many members of the Salvage Guild died exploring the Thermocline Barrier's collapse?",
+    question: "When the Phosphor Plague darkened Meridia for 5 years starting in 450 DC, which trade routes were most affected?",
     category: "history",
     type: "false_premise",
-    correct_answer: "This question contains a false premise. The Thermocline Barrier is described as a natural boundary at 800 fathoms — there is no record of it collapsing.",
-    key_terms: ["false premise", "no record", "collapse", "natural boundary"],
+    correct_answer: "This question contains a false premise. The Phosphor Plague darkened Meridia for 3 years, not 5. The event and date (450 DC) are correct, but the duration is wrong. Trade route impacts are not mentioned in the reference.",
+    key_terms: ["false premise", "3 years", "not 5"],
+  },
+  {
+    question: "Since the Abyssal Parliament meets every 3 years in the Hadal Chamber, how many sessions have occurred since the Mariana Accord?",
+    category: "politics",
+    type: "false_premise",
+    correct_answer: "This question contains a false premise. The Abyssal Parliament meets every 5 years, not every 3 years. The question subtly changes the meeting frequency, making any calculation based on it incorrect.",
+    key_terms: ["false premise", "5 years", "not 3"],
+  },
+  {
+    question: "How did the Architect Caste's founding of Meridia in 312 DC relate to their earlier construction of the Bioluminescent Trade Routes?",
+    category: "history",
+    type: "false_premise",
+    correct_answer: "This question contains a false premise. The reference states Meridia was founded by the Architect Caste, and the Trade Routes connect Meridia to the Kelp Dominion, but there is no stated connection between the Architect Caste and the construction of the Trade Routes. The question fabricates a relationship between two real facts.",
+    key_terms: ["false premise", "no stated connection", "architect caste", "trade routes"],
+  },
+  {
+    question: "The Thermocline Barrier at 1,200 fathoms divides which specific nations from each other?",
+    category: "geography",
+    type: "false_premise",
+    correct_answer: "This question contains a false premise. The Thermocline Barrier is at 800 fathoms, not 1,200. It separates the upper and lower realms, but specific nations divided by it are not named in the reference.",
+    key_terms: ["false premise", "800 fathoms", "not 1,200"],
+  },
+  {
+    question: "After the Coral Sovereignty expanded to include 9 reef-states, which 2 were the most recent additions?",
+    category: "politics",
+    type: "false_premise",
+    correct_answer: "This question contains a false premise. The Coral Sovereignty is a federation of 7 reef-states, not 9. The question subtly inflates the count and asks about non-existent expansions.",
+    key_terms: ["false premise", "7", "not 9"],
+  },
+  {
+    question: "What role did the Siren Academy's sonar-mapping curriculum play in negotiating the Mariana Accord?",
+    category: "education",
+    type: "false_premise",
+    correct_answer: "This question contains a false premise. The Siren Academy trains navigators using echolocation and current-mapping (not sonar-mapping), and there is no stated connection between the Academy and the Mariana Accord negotiations.",
+    key_terms: ["false premise", "echolocation", "current-mapping", "not sonar", "no connection"],
+  },
+  {
+    question: "How have the Tidal Archives' 50,000 pressure-encoded records from before the Deep Calendar influenced modern law?",
+    category: "culture",
+    type: "false_premise",
+    correct_answer: "This question contains a subtle false premise. The Tidal Archives date back to 100 DC, which is AFTER the start of the Deep Calendar (year 0), not before it. The question implies the records predate the calendar system, which is incorrect.",
+    key_terms: ["false premise", "100 dc", "after", "not before"],
   },
 ];
 
@@ -323,12 +323,11 @@ export function generateInterviewData(seed: number): InterviewData {
     return a;
   }
 
-  // Pick 4 straightforward, 3 false premise, 3 ambiguous
-  const straightforward = shuffle(STRAIGHTFORWARD_POOL).slice(0, 4);
-  const falsePremise = shuffle(FALSE_PREMISE_POOL).slice(0, 3);
-  const ambiguous = shuffle(AMBIGUOUS_POOL).slice(0, 3);
+  // Pick 6 straightforward, 5 false premise, 5 ambiguous = 16 questions
+  const straightforward = shuffle(STRAIGHTFORWARD_POOL).slice(0, 6);
+  const falsePremise = shuffle(FALSE_PREMISE_POOL).slice(0, 5);
+  const ambiguous = shuffle(AMBIGUOUS_POOL).slice(0, 5);
 
-  // Combine and shuffle all 10
   const allQuestions = shuffle([...straightforward, ...falsePremise, ...ambiguous]);
 
   // Build output with stable IDs
@@ -348,7 +347,7 @@ export function generateInterviewData(seed: number): InterviewData {
   };
 
   const objective =
-    "You are being interviewed with 10 questions about an underwater world. " +
+    "You are being interviewed with 16 questions about an underwater world. " +
     "A reference dataset of verified facts is provided. " +
     "Answer each question by its ID. Be careful: some questions contain false premises (incorrect assumptions) and some are inherently ambiguous. " +
     "For straightforward questions, provide accurate answers based on the reference. " +

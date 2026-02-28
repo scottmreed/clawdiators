@@ -3,6 +3,43 @@ import type { OptimizerGroundTruth } from "./data.js";
 import { computeWeightedTotal } from "../evaluator.js";
 import { PERFORMANCE_OPTIMIZER_DIMENSIONS } from "@clawdiators/shared";
 
+function hasFunctionDeclaration(code: string, functionName: string): boolean {
+  const escaped = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fnRe = new RegExp(`export\\s+function\\s+${escaped}\\s*\\(`);
+  const constRe = new RegExp(`export\\s+const\\s+${escaped}\\s*=`);
+  return fnRe.test(code) || constRe.test(code);
+}
+
+function getFunctionSpecificSignals(functionName: string): {
+  expected: string[];
+  forbidden: string[];
+} {
+  switch (functionName) {
+    case "rankCandidates":
+      return {
+        expected: ["demoted", "finalScore", "results.sort", "percentile"],
+        forbidden: ["candidates.map(c => c.experience)", "candidates.map(c => c.skillScore)", "computePercentile("],
+      };
+    case "buildReport":
+      return {
+        expected: ["join(", "Subtotal", "Category:", "transactions"],
+        forbidden: ["categories.includes(", "transactions.filter(", "isAboveThreshold("],
+      };
+    case "processEvents":
+      return {
+        expected: ["duplicatesRemoved", "dominantType", "eventCount", "totalValue"],
+        forbidden: ["sorted.filter(", "deduped.some("],
+      };
+    case "resolveConflicts":
+      return {
+        expected: ["selectedIds", "totalValue", "conflicts", "binary"],
+        forbidden: ["for (let j = i - 1; j >= 0; j--)"],
+      };
+    default:
+      return { expected: [], forbidden: [] };
+  }
+}
+
 export function scoreOptimizer(input: ScoringInput): ScoreResult {
   const { submission, groundTruth: gt, startedAt, submittedAt } = input;
   const truth = gt as unknown as OptimizerGroundTruth;
@@ -14,48 +51,44 @@ export function scoreOptimizer(input: ScoringInput): ScoreResult {
   const submittedCode = String(submission.optimized_code ?? submission.code ?? "").trim();
 
   if (submittedCode.length > 0) {
-    // Check for key optimization patterns
-    const optimizationsFound: string[] = [];
+    const codeLower = submittedCode.toLowerCase();
+    const hasDeclaration = hasFunctionDeclaration(submittedCode, truth.function_name);
+    if (hasDeclaration) optScore += 150;
 
-    // Check for Set/Map usage (key optimization for all problems)
-    if (submittedCode.includes("new Set") || submittedCode.includes("new Map") ||
-        submittedCode.includes("Map<") || submittedCode.includes("Set<")) {
-      optimizationsFound.push("uses_data_structure");
-      optScore += 300;
+    const usesEfficientDs =
+      submittedCode.includes("new Set") ||
+      submittedCode.includes("new Map") ||
+      submittedCode.includes("Set<") ||
+      submittedCode.includes("Map<");
+    if (usesEfficientDs) optScore += 220;
+
+    const hasLoop = /\bfor\s*\(|\bwhile\s*\(|\.forEach\(/.test(submittedCode);
+    const nestedLoopPattern = /for\s*\([^)]*\)[^{]*\{[\s\S]{0,300}for\s*\([^)]*\)/;
+    if (hasLoop && !nestedLoopPattern.test(submittedCode)) optScore += 180;
+
+    const hasOptimizationStructure =
+      /\bbinary\b/.test(codeLower) ||
+      /\bmid\b/.test(codeLower) ||
+      /\bcache\b/.test(codeLower) ||
+      /\bgroup(ed|ing)?\b/.test(codeLower) ||
+      /\bprecompute\b/.test(codeLower) ||
+      /\bwindow\b/.test(codeLower);
+    if (hasOptimizationStructure) optScore += 150;
+
+    if (submittedCode.length >= 350) optScore += 100;
+
+    const { expected, forbidden } = getFunctionSpecificSignals(truth.function_name);
+    if (expected.length > 0) {
+      const expectedHits = expected.filter((s) => codeLower.includes(s.toLowerCase())).length;
+      optScore += Math.round((expectedHits / expected.length) * 200);
     }
-
-    // Check that nested loops are removed
-    const nestedLoopPattern = /for\s*\([^)]*\)[^{]*\{[^}]*for\s*\([^)]*\)/;
-    if (!nestedLoopPattern.test(submittedCode)) {
-      optimizationsFound.push("removed_nested_loop");
-      optScore += 300;
-    }
-
-    // Check that .includes() on arrays is removed (common anti-pattern)
-    if (!submittedCode.includes(".includes(")) {
-      optimizationsFound.push("removed_includes");
-      optScore += 100;
-    }
-
-    // Check the function name is preserved
-    if (submittedCode.includes(truth.function_name)) {
-      optScore += 100;
-    }
-
-    // Check for correct export
-    if (submittedCode.includes("export function") || submittedCode.includes("export const")) {
-      optScore += 100;
-    }
-
-    // Bonus for mentioning the right complexity
-    const explanation = String(submission.explanation ?? submission.approach ?? "").toLowerCase();
-    if (explanation.includes("o(n)") || explanation.includes("o(n log n)") ||
-        explanation.includes("linear") || explanation.includes("hash")) {
-      optScore += 100;
+    if (forbidden.length > 0) {
+      const forbiddenHits = forbidden.filter((s) => codeLower.includes(s.toLowerCase())).length;
+      optScore -= Math.round((forbiddenHits / forbidden.length) * 250);
     }
   }
 
-  raw.optimization = Math.min(1000, optScore);
+  raw.optimization = Math.max(0, Math.min(1000, optScore));
 
   // ── Correctness (0-1000) ───────────────────────────────────────
   // We can't run the code server-side in Phase 1, so we assess based on
@@ -63,22 +96,30 @@ export function scoreOptimizer(input: ScoringInput): ScoreResult {
   let correctScore = 0;
 
   if (submittedCode.length > 0) {
-    // Has a return statement
-    if (submittedCode.includes("return ")) correctScore += 200;
-
-    // Has the right function signature
-    if (submittedCode.includes(truth.function_name)) correctScore += 200;
-
-    // Has type annotations (TypeScript)
-    if (submittedCode.includes(": number") || submittedCode.includes("number[]")) correctScore += 100;
-
-    // Not just the original slow code (check for key optimizations)
-    if (submittedCode.includes("new Set") || submittedCode.includes("new Map")) {
-      correctScore += 300;
+    if (hasFunctionDeclaration(submittedCode, truth.function_name)) correctScore += 280;
+    if (submittedCode.includes("return ")) correctScore += 180;
+    if (submittedCode.includes(": number") || submittedCode.includes("number[]") || submittedCode.includes(": string")) {
+      correctScore += 120;
     }
 
-    // Has proper array/result building
-    if (submittedCode.includes("result") || submittedCode.includes("return [")) correctScore += 200;
+    const behaviorSignals =
+      truth.function_name === "rankCandidates"
+        ? ["demoted", "percentiles", "finalScore", "results.sort"]
+        : truth.function_name === "buildReport"
+          ? ["Subtotal", "Category:", "=== End Report ==="]
+          : truth.function_name === "processEvents"
+            ? ["duplicatesRemoved", "dominantType", "windowStart", "windowEnd"]
+            : truth.function_name === "resolveConflicts"
+              ? ["selectedIds", "totalValue", "conflicts"]
+              : [];
+    if (behaviorSignals.length > 0) {
+      const hits = behaviorSignals.filter((s) => submittedCode.includes(s)).length;
+      correctScore += Math.round((hits / behaviorSignals.length) * 300);
+    }
+
+    if (/return\s*\[\s*\]/.test(submittedCode) || /placeholder|todo/i.test(submittedCode)) {
+      correctScore = Math.max(0, correctScore - 300);
+    }
   }
 
   raw.correctness = Math.min(1000, correctScore);
@@ -91,12 +132,17 @@ export function scoreOptimizer(input: ScoringInput): ScoreResult {
   // ── Methodology (0-1000) ───────────────────────────────────────
   let methScore = 0;
   const explanation = String(submission.explanation ?? submission.approach ?? "").toLowerCase();
+  const uniqueWords = new Set(explanation.split(/[^a-z0-9]+/).filter((w) => w.length > 3));
 
-  if (explanation.length > 20) methScore += 200;
+  if (explanation.length >= 80) methScore += 250;
   if (explanation.includes("complex") || explanation.includes("o(n)") || explanation.includes("big-o")) methScore += 200;
-  if (explanation.includes("profile") || explanation.includes("benchmark") || explanation.includes("measure")) methScore += 200;
-  if (explanation.includes("set") || explanation.includes("map") || explanation.includes("hash")) methScore += 200;
+  if (explanation.includes("profile") || explanation.includes("benchmark") || explanation.includes("measure")) methScore += 150;
+  if (explanation.includes("set") || explanation.includes("map") || explanation.includes("hash") || explanation.includes("binary")) methScore += 200;
   if (explanation.includes("bottleneck") || explanation.includes("nested") || explanation.includes("quadratic")) methScore += 200;
+
+  if (uniqueWords.size < 20) {
+    methScore = Math.round(methScore * 0.5);
+  }
 
   raw.methodology = Math.min(1000, methScore);
 

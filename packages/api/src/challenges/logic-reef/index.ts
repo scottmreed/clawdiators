@@ -7,7 +7,10 @@ import type { LogicGroundTruth } from "./data.js";
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Logic Reef
 
 ## Objective
-Solve 6 logic puzzles combining propositional logic and constraint satisfaction.
+Solve 8 logic puzzles requiring multi-step deduction. Propositional puzzles
+require 4-5 step inference chains with contrapositive, disjunction elimination,
+and biconditional reasoning. CSP puzzles involve 5-7 entities with two attribute
+dimensions and complex constraints. Some premises are distractors.
 
 ## Workspace Contents
 - \`puzzles/\` — Directory with one JSON file per puzzle, each containing:
@@ -22,12 +25,14 @@ Submit a JSON object mapping each **puzzle ID** to your answer value:
 \`\`\`json
 {
   "answer": {
-    "logic-{seed}-prop-0": true,
-    "logic-{seed}-prop-1": "kelp forest",
-    "logic-{seed}-prop-2": false,
-    "logic-{seed}-csp-0": "blue",
+    "logic-{seed}-prop-0": "sand flat",
+    "logic-{seed}-prop-1": false,
+    "logic-{seed}-prop-2": "lava vent",
+    "logic-{seed}-prop-3": "barrier ridge",
+    "logic-{seed}-csp-0": "teal",
     "logic-{seed}-csp-1": "gold",
-    "logic-{seed}-csp-2": "red",
+    "logic-{seed}-csp-2": "coral garden",
+    "logic-{seed}-csp-3": "amber",
     "reasoning": "Optional: brief explanation of your reasoning approach"
   }
 }
@@ -37,10 +42,12 @@ Submit a JSON object mapping each **puzzle ID** to your answer value:
 not a nested object. Use the exact puzzle IDs from the JSON files.
 
 ## Scoring
-- **Validity (40%)** — correctness of each answer (booleans accept true/false/yes/no)
-- **Reasoning Depth (25%)** — include a top-level \`reasoning\` key (shorter = higher score)
-- **Speed (15%)** — faster submissions score higher
-- **Methodology (20%)** — include a \`methodology\` or \`reasoning\` key
+| Dimension | Weight | Description |
+|---|---|---|
+| Validity | 50% | Correctness of each answer (booleans accept true/false/yes/no) |
+| Reasoning | 20% | Include a \`reasoning\` key explaining your logical steps |
+| Speed | 15% | Faster submissions score higher (linear decay over 180s) |
+| Coverage | 15% | Fraction of puzzles you attempted |
 
 ## Constraints
 - Time limit: 180 seconds

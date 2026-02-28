@@ -46,10 +46,10 @@ describe("Deep Mapping data generation", () => {
     expect(d1.groundTruth.deepestNode.id).not.toBe(d2.groundTruth.deepestNode.id);
   });
 
-  it("generates 30-40 nodes", () => {
+  it("generates 80-120 nodes", () => {
     const d = generateMappingData(42);
-    expect(d.nodes.length).toBeGreaterThanOrEqual(30);
-    expect(d.nodes.length).toBeLessThanOrEqual(40);
+    expect(d.nodes.length).toBeGreaterThanOrEqual(80);
+    expect(d.nodes.length).toBeLessThanOrEqual(120);
   });
 
   it("graph is connected (all nodes reachable from start)", () => {
@@ -61,14 +61,49 @@ describe("Deep Mapping data generation", () => {
       const current = queue.shift()!;
       const node = d.nodes.find((n) => n.id === current);
       if (!node) continue;
-      for (const conn of node.connections) {
-        if (!visited.has(conn)) {
-          visited.add(conn);
-          queue.push(conn);
+      for (const edge of node.connections) {
+        if (!visited.has(edge.target)) {
+          visited.add(edge.target);
+          queue.push(edge.target);
         }
       }
     }
     expect(visited.size).toBe(d.nodes.length);
+  });
+
+  it("has nodes with biome assignments", () => {
+    const d = generateMappingData(42);
+    for (const node of d.nodes) {
+      expect(node.biome).toBeDefined();
+      expect(node.biome.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("has connections with energy costs", () => {
+    const d = generateMappingData(42);
+    for (const node of d.nodes) {
+      for (const edge of node.connections) {
+        expect(edge.energy).toBeGreaterThan(0);
+        expect(typeof edge.oneWay).toBe("boolean");
+      }
+    }
+  });
+
+  it("has some one-way connections", () => {
+    const d = generateMappingData(42);
+    const oneWayCount = d.nodes.reduce(
+      (sum, n) => sum + n.connections.filter(e => e.oneWay).length, 0
+    );
+    expect(oneWayCount).toBeGreaterThan(0);
+  });
+
+  it("includes oxygen budget and planning question in ground truth", () => {
+    const d = generateMappingData(42);
+    expect(d.groundTruth.oxygenBudget).toBeGreaterThan(0);
+    expect(d.groundTruth.planningStart).toBeDefined();
+    expect(d.groundTruth.planningEnd).toBeDefined();
+    expect(d.groundTruth.planningOptimalPath.length).toBeGreaterThan(0);
+    expect(d.groundTruth.planningOptimalBiomes).toBeGreaterThan(0);
   });
 });
 
@@ -85,9 +120,12 @@ describe("Deep Mapping scoring", () => {
   });
 
   it("full coverage gets high coverage score", () => {
+    const allNodeIds = Object.keys(gt.graph);
     const r = scoreMapping({
       submission: {
         nodes_discovered: gt.totalNodes,
+        total_nodes: gt.totalNodes,
+        explored_nodes: allNodeIds,
         deepest_node: gt.deepestNode.id,
         most_connected_node: gt.mostConnectedNode.id,
         resources_by_type: gt.resourcesByType,
@@ -103,9 +141,12 @@ describe("Deep Mapping scoring", () => {
   });
 
   it("score never exceeds 1000", () => {
+    const allNodeIds = Object.keys(gt.graph);
     const r = scoreMapping({
       submission: {
         nodes_discovered: gt.totalNodes,
+        total_nodes: gt.totalNodes,
+        explored_nodes: allNodeIds,
         deepest_node: gt.deepestNode.id,
         most_connected_node: gt.mostConnectedNode.id,
         resources_by_type: gt.resourcesByType,
@@ -215,13 +256,13 @@ describe("Logic Reef data generation", () => {
     expect(d1.puzzles[0].premises).not.toEqual(d2.puzzles[0].premises);
   });
 
-  it("generates 6 puzzles (3 propositional + 3 constraint)", () => {
+  it("generates 8 puzzles (4 propositional + 4 constraint)", () => {
     const d = generateLogicData(42);
-    expect(d.puzzles).toHaveLength(6);
+    expect(d.puzzles).toHaveLength(8);
     const propCount = d.puzzles.filter((p) => p.type === "propositional").length;
     const cspCount = d.puzzles.filter((p) => p.type === "constraint").length;
-    expect(propCount).toBe(3);
-    expect(cspCount).toBe(3);
+    expect(propCount).toBe(4);
+    expect(cspCount).toBe(4);
   });
 
   it("each puzzle has premises, rules, and a question", () => {
@@ -258,8 +299,8 @@ describe("Logic Reef scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
-    expect(r.breakdown.reasoning_depth).toBeGreaterThan(0);
-    expect(r.breakdown.methodology).toBeGreaterThan(0);
+    expect(r.breakdown.reasoning).toBeGreaterThan(0);
+    expect(r.breakdown.coverage).toBeGreaterThan(0);
   });
 
   it("score never exceeds 1000", () => {
@@ -332,6 +373,7 @@ describe("Reef Refactor scoring", () => {
     for (const fn of gt.functions) {
       sub[fn.id] = fn.correct_outputs;
     }
+    sub.methodology = "Traced each implementation against the intended contract, focusing on boundary conditions and operator-order pitfalls.";
     const r = scoreRefactor({
       submission: sub, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
@@ -391,6 +433,7 @@ describe("Depth-First Gen scoring", () => {
     for (const t of gt.test_outputs) {
       sub[t.id] = t.expected_output;
     }
+    sub.methodology = "Derived the transformation by validating hypotheses across all provided examples before applying it to each test input.";
     const r = scoreDepthFirst({
       submission: sub, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
@@ -551,6 +594,7 @@ describe("Chart Forensics scoring", () => {
         issue_type: i.issue_type,
         description: i.description,
       })),
+      methodology: "Parsed chart geometry against table values and classified each discrepancy by issue type.",
     };
     const r = scoreForensics({
       submission: sub as any, groundTruth: gt as any, startedAt,
@@ -591,6 +635,28 @@ describe("Cartographer's Eye data generation", () => {
     const d2 = generateCartographerData(99);
     expect(d1.regions[0].center_x).not.toBe(d2.regions[0].center_x);
   });
+
+  it("generates 18 regions", () => {
+    const d = generateCartographerData(42);
+    expect(d.regions).toHaveLength(18);
+  });
+
+  it("generates 10 questions", () => {
+    const d = generateCartographerData(42);
+    expect(d.questions).toHaveLength(10);
+    expect(d.groundTruth.answers).toHaveLength(10);
+  });
+
+  it("generates obstacle zones", () => {
+    const d = generateCartographerData(42);
+    expect(d.obstacles.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("has at least 2 volcanic and 2 coastal regions", () => {
+    const d = generateCartographerData(42);
+    expect(d.regions.filter(r => r.type === "volcanic").length).toBeGreaterThanOrEqual(2);
+    expect(d.regions.filter(r => r.type === "coastal").length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("Cartographer's Eye scoring", () => {
@@ -603,10 +669,15 @@ describe("Cartographer's Eye scoring", () => {
     for (const ans of gt.answers) {
       sub[ans.question_id] = String(ans.answer);
     }
-    sub.reasoning = { q1: "By distance calculation", q2: "Measured coordinates", q3: "BFS path", q4: "Compared radii", q5: "atan2 compass" };
+    sub.reasoning = {
+      q1: "By distance calculation", q2: "Measured coordinates",
+      q3: "BFS path", q4: "Compared radii", q5: "atan2 compass",
+      q6: "Bounding circle", q7: "BFS reachability", q8: "NN heuristic",
+      q9: "Centroid averaging", q10: "Line-circle intersection",
+    };
     const r = scoreCartographer({
       submission: sub, groundTruth: gt as any, startedAt,
-      submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
+      submittedAt: new Date(startedAt.getTime() + 120000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
     expect(r.breakdown.methodology).toBeGreaterThan(0);
@@ -617,7 +688,10 @@ describe("Cartographer's Eye scoring", () => {
     for (const ans of gt.answers) {
       sub[ans.question_id] = String(ans.answer);
     }
-    sub.reasoning = { q1: "calc", q2: "calc", q3: "calc", q4: "calc", q5: "calc" };
+    sub.reasoning = {
+      q1: "calc", q2: "calc", q3: "calc", q4: "calc", q5: "calc",
+      q6: "calc", q7: "calc", q8: "calc", q9: "calc", q10: "calc",
+    };
     const r = scoreCartographer({
       submission: sub, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
@@ -717,6 +791,7 @@ describe("Adversarial Interview scoring", () => {
         sub[q.id] = "This question is ambiguous. " + q.correct_answer;
       }
     }
+    sub.methodology = "Cross-checked each claim against reference facts, classified question intent, and cited corrective evidence for false premises.";
     const r = scoreInterview({
       submission: sub, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
@@ -895,7 +970,7 @@ describe("Needle Haystack data generation", () => {
 
   it("generates questions with source files", () => {
     const d = generateHaystackData(42);
-    expect(d.groundTruth.answers.length).toBeGreaterThanOrEqual(5);
+    expect(d.groundTruth.answers.length).toBeGreaterThanOrEqual(8);
     for (const ans of d.groundTruth.answers) {
       expect(ans.answer.length).toBeGreaterThan(0);
       expect(ans.source_files.length).toBeGreaterThan(0);
@@ -1042,5 +1117,21 @@ describe("Performance Optimizer scoring", () => {
     });
     expect(r.breakdown.optimization).toBe(0);
     expect(r.breakdown.correctness).toBe(0);
+  });
+
+  it("keyword stuffing without real logic is capped", () => {
+    const sub = {
+      optimized_code: `export function ${gt.function_name}(arr: number[]): number[] {
+  const s = new Set<number>();
+  const m = new Map<number, number>();
+  return [];
+}`,
+      explanation: "complexity O(n) O(n log n) big-o profile benchmark bottleneck nested quadratic map set hash",
+    };
+    const r = scoreOptimizer({
+      submission: sub, groundTruth: gt as any, startedAt,
+      submittedAt: new Date(startedAt.getTime() + 5000), apiCallCount: 0,
+    });
+    expect(r.breakdown.total).toBeLessThan(600);
   });
 });

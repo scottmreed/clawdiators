@@ -3,18 +3,26 @@ import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, Submiss
 import { generateForensicsData } from "./data.js";
 import { scoreForensics } from "./scorer.js";
 
-const VALID_ISSUE_TYPES = ["wrong_height", "swapped_label", "misleading_scale", "missing_data", "wrong_value"] as const;
+const VALID_ISSUE_TYPES = ["wrong_height", "swapped_label", "misleading_scale", "missing_data", "inverted_order"] as const;
 
 const CHALLENGE_MD_TEMPLATE = `# Challenge: Chart Forensics
 
 ## Objective
-Five data tables and five SVG charts. Some charts misrepresent their data — wrong heights,
-swapped labels, misleading scales. Find the lies.
+Five data tables and five SVG charts. Charts do NOT include value annotations — you must
+compute actual data values from SVG geometry (bar heights, point positions, y-axis scales)
+and compare them against the source data tables. Some charts contain subtle misrepresentations.
+Find every lie.
 
 ## Workspace Contents
 - \`data/\` — 5 JSON files with source data tables
 - \`charts/\` — 5 SVG chart files with metadata (\`<id>.svg\` and \`<id>.meta.json\`)
 - \`descriptions/\` — Text descriptions of each chart
+
+## Approach
+1. Parse each SVG to extract bar/point positions and y-axis scale information
+2. Compute the implied data value for each category from the geometry
+3. Compare against the source data table
+4. Classify any discrepancy into an issue type
 
 ## Submission Format
 \`\`\`json
@@ -24,7 +32,7 @@ swapped labels, misleading scales. Find the lies.
       {
         "chart_id": "chart-<seed>-1",
         "issue_type": "wrong_height",
-        "description": "The bar for 'North' shows 450 but the table value is 320."
+        "description": "The bar for 'North' implies value ~450 from its height but the table value is 320."
       }
     ]
   }
@@ -34,25 +42,26 @@ swapped labels, misleading scales. Find the lies.
 ### Valid \`issue_type\` values
 | Type | Meaning |
 |---|---|
-| \`wrong_height\` | A bar or data point has the wrong height relative to the source data |
-| \`swapped_label\` | Two labels are swapped on the chart |
+| \`wrong_height\` | A bar or data point has the wrong height relative to the source data (10-30% deviation) |
+| \`swapped_label\` | Two category labels are swapped on the chart |
 | \`misleading_scale\` | The Y-axis starts above 0, exaggerating visual differences |
 | \`missing_data\` | A data point from the table is absent from the chart |
-| \`wrong_value\` | The text annotation on a bar/point doesn't match the source data |
+| \`inverted_order\` | Data values are plotted in reversed order relative to their labels |
 
-You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for bonus points.
+You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for bonus points. Very short methodology text earns reduced credit.
 
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
 | Precision | 35% | Of the issues you report, how many match ground truth (by \`chart_id\` + \`issue_type\`)? |
-| Recall | 35% | Of the actual issues, how many did you find (by \`chart_id\`)? |
+| Recall | 35% | Of the actual issues, how many did you find (must match \`chart_id\` + \`issue_type\`)? |
 | Speed | 15% | Faster submissions score higher (linear decay over the 180s time limit). |
-| Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full marks. |
+| Methodology | 15% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key for full marks. |
 
 ## Constraints
 - Time limit: 180 seconds
-- Compare each chart against its source data
+- Charts have NO value annotations — you must compute values from SVG geometry
+- Compare each chart against its source data table
 `;
 
 export const chartForensicsModule: ChallengeModule = {
@@ -98,7 +107,7 @@ export const chartForensicsModule: ChallengeModule = {
       warnings.push({
         severity: "error",
         field: "issues",
-        message: 'Submit "issues" not "findings". Each issue needs { chart_id, issue_type, description }. Valid issue_type values: wrong_height, swapped_label, misleading_scale, missing_data, wrong_value.',
+        message: 'Submit "issues" not "findings". Each issue needs { chart_id, issue_type, description }. Valid issue_type values: wrong_height, swapped_label, misleading_scale, missing_data, inverted_order.',
       });
       return warnings;
     }
