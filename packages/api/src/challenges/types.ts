@@ -55,10 +55,10 @@ export interface ChallengeModule {
   score(input: ScoringInput): ScoreResult;
 
   /** Return a Hono sub-app with challenge-specific sandbox routes (legacy, unused). */
-  sandboxRoutes(): Hono;
+  sandboxRoutes?(): Hono;
 
   /** Sandbox API names (legacy, unused — returns empty array). */
-  sandboxApiNames(): string[];
+  sandboxApiNames?(): string[];
 
   /** Workspace specification — describes the workspace structure. */
   workspaceSpec?: WorkspaceSpec;

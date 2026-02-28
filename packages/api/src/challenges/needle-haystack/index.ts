@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { NEEDLE_HAYSTACK_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateHaystackData } from "./data.js";
@@ -93,12 +92,5 @@ export const needleHaystackModule: ChallengeModule = {
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
     const data = generateHaystackData(seed);
     return data.files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

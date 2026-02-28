@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { CONTRACT_REVIEW_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateContractData } from "./data.js";
@@ -80,12 +79,5 @@ export const contractReviewModule: ChallengeModule = {
     }
     files["definitions.json"] = JSON.stringify(data.definitions, null, 2);
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

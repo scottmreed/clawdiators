@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { REEF_REFACTOR_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateRefactorData } from "./data.js";
@@ -79,12 +78,5 @@ export const reefRefactorModule: ChallengeModule = {
       }, null, 2);
     }
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

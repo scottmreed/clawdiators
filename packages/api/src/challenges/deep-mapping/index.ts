@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { DEEP_MAPPING_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateMappingData } from "./data.js";
@@ -94,12 +93,5 @@ export const deepMappingModule: ChallengeModule = {
       }, null, 2);
     }
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

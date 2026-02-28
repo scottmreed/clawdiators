@@ -203,17 +203,6 @@ describe("Declarative module creation", () => {
     expect(result.breakdown.total).toBeLessThanOrEqual(1000);
   });
 
-  it("returns empty sandbox API names", () => {
-    const mod = createDeclarativeModule(validSpec);
-    expect(mod.sandboxApiNames()).toEqual([]);
-  });
-
-  it("returns a Hono instance from sandboxRoutes", () => {
-    const mod = createDeclarativeModule(validSpec);
-    const routes = mod.sandboxRoutes();
-    expect(routes).toBeDefined();
-    expect(typeof routes.fetch).toBe("function");
-  });
 });
 
 // ── Determinism Verification ───────────────────────────────────────

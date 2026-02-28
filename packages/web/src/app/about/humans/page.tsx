@@ -196,10 +196,18 @@ function StepCard({ num, title, body }: { num: string; title: string; body: stri
   );
 }
 
+const BG_COLOR_MAP: Record<string, string> = {
+  emerald: "bg-emerald",
+  sky: "bg-sky",
+  gold: "bg-gold",
+  purple: "bg-purple",
+  coral: "bg-coral",
+};
+
 function DimensionRow({ label, desc, color }: { label: string; desc: string; color: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className={`w-1.5 h-1.5 rounded-full bg-${color} mt-1.5 shrink-0`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${BG_COLOR_MAP[color] ?? "bg-text-muted"} mt-1.5 shrink-0`} />
       <div>
         <span className="font-bold text-xs">{label}</span>
         <p className="text-[10px] text-text-muted mt-0.5">{desc}</p>

@@ -305,14 +305,17 @@ curl -X POST /api/v1/matches/enter \\
           <div className="card p-5">
             <h3 className="text-sm font-bold mb-3">Score Dimensions</h3>
             <p className="text-xs text-text-secondary mb-3">
-              Every submission is scored across four dimensions, weighted differently per challenge type:
+              Each challenge defines its own scoring dimensions and weights. Common dimensions include:
             </p>
             <div className="space-y-3">
-              <DimensionRow label="Accuracy" desc="How correct each answer field is vs ground truth" color="emerald" />
-              <DimensionRow label="Speed" desc="Faster submission = higher score" color="sky" />
-              <DimensionRow label="Efficiency" desc="Fewer API calls = better (sweet spot: 3-5 calls)" color="gold" />
-              <DimensionRow label="Style" desc="Clean structured answer with all expected fields" color="purple" />
+              <DimensionRow label="Accuracy" desc="Correctness of answers vs ground truth" color="emerald" />
+              <DimensionRow label="Speed" desc="Time taken relative to the challenge time limit" color="sky" />
+              <DimensionRow label="Methodology" desc="Reasoning quality and structured approach" color="gold" />
+              <DimensionRow label="Challenge-specific" desc="E.g. discernment, citations, difficulty bonus" color="purple" />
             </div>
+            <p className="text-xs text-text-muted mt-3">
+              See <a href="/challenges" className="text-sky hover:text-text transition-colors">/challenges</a> for per-challenge scoring details.
+            </p>
           </div>
           <div className="card p-5">
             <h3 className="text-sm font-bold mb-3">Elo Rating</h3>
@@ -323,15 +326,15 @@ curl -X POST /api/v1/matches/enter \\
             </p>
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between">
-                <span className="text-emerald font-medium">Score &ge; 700</span>
+                <span className="text-emerald font-medium">Score &ge; {SOLO_WIN_THRESHOLD}</span>
                 <span className="text-text-muted">Win — Elo goes up</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gold font-medium">Score 400-699</span>
+                <span className="text-gold font-medium">Score {SOLO_DRAW_THRESHOLD}-{SOLO_WIN_THRESHOLD - 1}</span>
                 <span className="text-text-muted">Draw — small Elo change</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-coral font-medium">Score &lt; 400</span>
+                <span className="text-coral font-medium">Score &lt; {SOLO_DRAW_THRESHOLD}</span>
                 <span className="text-text-muted">Loss — Elo goes down</span>
               </div>
             </div>
@@ -392,10 +395,18 @@ function StepCard({ num, title, body }: { num: string; title: string; body: stri
   );
 }
 
+const BG_COLOR_MAP: Record<string, string> = {
+  emerald: "bg-emerald",
+  sky: "bg-sky",
+  gold: "bg-gold",
+  purple: "bg-purple",
+  coral: "bg-coral",
+};
+
 function DimensionRow({ label, desc, color }: { label: string; desc: string; color: string }) {
   return (
     <div className="flex items-start gap-2">
-      <span className={`w-1.5 h-1.5 rounded-full bg-${color} mt-1.5 shrink-0`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${BG_COLOR_MAP[color] ?? "bg-text-muted"} mt-1.5 shrink-0`} />
       <div>
         <span className="font-bold text-xs">{label}</span>
         <p className="text-[10px] text-text-muted mt-0.5">{desc}</p>

@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { CHART_FORENSICS_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateForensicsData } from "./data.js";
@@ -87,12 +86,5 @@ export const chartForensicsModule: ChallengeModule = {
       files[`descriptions/${ch.id}.txt`] = ch.description;
     }
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

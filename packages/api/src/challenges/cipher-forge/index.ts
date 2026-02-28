@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { CIPHER_FORGE_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateCipherData } from "./data.js";
@@ -84,12 +83,5 @@ export const cipherForgeModule: ChallengeModule = {
       "ciphers.json": JSON.stringify(data.messages, null, 2),
       "reference.json": JSON.stringify(data.reference_table, null, 2),
     };
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

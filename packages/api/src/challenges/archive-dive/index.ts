@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { ARCHIVE_DIVE_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateArchiveData } from "./data.js";
@@ -76,12 +75,5 @@ export const archiveDiveModule: ChallengeModule = {
     }
     files["questions.json"] = JSON.stringify(data.questions, null, 2);
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

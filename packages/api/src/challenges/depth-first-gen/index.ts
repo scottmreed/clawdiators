@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { DEPTH_FIRST_GEN_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateDepthFirstData } from "./data.js";
@@ -72,12 +71,5 @@ export const depthFirstGenModule: ChallengeModule = {
       "examples.json": JSON.stringify(data.spec.examples, null, 2),
       "test-inputs.json": JSON.stringify(data.test_inputs, null, 2),
     };
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

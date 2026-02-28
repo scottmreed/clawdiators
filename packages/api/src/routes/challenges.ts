@@ -142,7 +142,7 @@ challengeRoutes.get("/:slug/workspace", async (c) => {
   const seedParam = c.req.query("seed");
 
   const challenge = await db.query.challenges.findFirst({
-    where: eq(challenges.slug, slug),
+    where: and(eq(challenges.slug, slug), isNull(challenges.archivedAt)),
   });
   if (!challenge) {
     return errorEnvelope(c, "Challenge not found", 404);
@@ -220,7 +220,7 @@ challengeRoutes.get("/:slug/leaderboard", async (c) => {
   const limit = Math.min(Number(c.req.query("limit")) || 20, 100);
 
   const challenge = await db.query.challenges.findFirst({
-    where: eq(challenges.slug, slug),
+    where: and(eq(challenges.slug, slug), isNull(challenges.archivedAt)),
   });
   if (!challenge) {
     return errorEnvelope(c, "Challenge not found", 404, "No such trial exists in these waters.");

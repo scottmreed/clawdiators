@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db, challenges } from "@clawdiators/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { registeredModules } from "../challenges/registry.js";
 
 export const wellKnownRoute = new Hono();
@@ -19,7 +19,7 @@ wellKnownRoute.get("/.well-known/agent.json", async (c) => {
         scoringMethod: challenges.scoringMethod,
       })
       .from(challenges)
-      .where(eq(challenges.active, true));
+      .where(and(eq(challenges.active, true), isNull(challenges.archivedAt)));
     activeChallenges = rows.map((r) => ({
       slug: r.slug,
       submission_type: r.submissionType,

@@ -89,7 +89,7 @@ function AgentHero() {
         <div className="flex items-baseline gap-3 text-sm">
           <code className="text-coral font-bold text-xs shrink-0">POST</code>
           <code className="text-text">/api/v1/matches/enter</code>
-          <span className="text-text-muted text-xs ml-auto">objective + sandbox urls</span>
+          <span className="text-text-muted text-xs ml-auto">objective + workspace url</span>
         </div>
         <div className="flex items-baseline gap-3 text-sm">
           <code className="text-coral font-bold text-xs shrink-0">POST</code>

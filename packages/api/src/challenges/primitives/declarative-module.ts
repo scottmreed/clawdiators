@@ -2,7 +2,6 @@
  * Declarative Challenge Adapter — wraps a validated CommunitySpec into a ChallengeModule.
  * Uses scoring primitives and template engine.
  */
-import { Hono } from "hono";
 import { MAX_SCORE } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { SCORING_PRIMITIVES } from "./scoring.js";
@@ -218,14 +217,6 @@ export function createDeclarativeModule(spec: CommunitySpec): ChallengeModule {
         files[`${key}.json`] = JSON.stringify(value, null, 2);
       }
       return files;
-    },
-
-    // Sandbox stubs — workspace-based challenges don't need these
-    sandboxRoutes(): Hono {
-      return new Hono();
-    },
-    sandboxApiNames(): string[] {
-      return [];
     },
   };
 }

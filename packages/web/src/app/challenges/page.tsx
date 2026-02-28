@@ -57,7 +57,7 @@ export default async function ChallengesPage() {
   } catch {}
 
   return (
-    <Suspense>
+    <Suspense fallback={<div className="pt-14"><div className="mx-auto max-w-7xl px-6 py-8 text-text-muted text-sm">Loading challenges...</div></div>}>
       <ChallengesView challenges={challenges} tracks={tracks} />
     </Suspense>
   );

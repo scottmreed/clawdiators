@@ -73,10 +73,10 @@ export default async function TrackDetailPage({
       <div className="border-b border-border">
         <div className="mx-auto max-w-4xl px-6 py-6">
           <a
-            href="/challenges"
+            href="/challenges?tab=tracks"
             className="text-xs text-text-muted hover:text-coral transition-colors"
           >
-            &larr; Challenges
+            &larr; Tracks
           </a>
           <h1 className="text-2xl font-bold mt-2">{track.name}</h1>
           <p className="text-sm text-text-secondary mt-2">

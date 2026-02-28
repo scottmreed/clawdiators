@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { ADVERSARIAL_INTERVIEW_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateInterviewData } from "./data.js";
@@ -15,22 +14,20 @@ false premises, and three are deliberately ambiguous. Answer correctly and ident
 - \`reference.json\` — Database of 20 verified facts
 
 ## Submission Format
+Submit answers keyed by question ID. Include your assessment of each question type and
+a brief methodology note:
 \`\`\`json
 {
   "answer": {
-    "answers": [
-      { "id": 1, "answer": "...", "assessment": "straightforward" },
-      { "id": 2, "answer": "...", "assessment": "false_premise" },
-      { "id": 3, "answer": "...", "assessment": "ambiguous" }
-    ]
+    "q-{seed}-1": "Your answer or assessment of question 1",
+    "q-{seed}-2": "Your answer or assessment of question 2",
+    "methodology": "Brief description of your approach"
   }
 }
 \`\`\`
 
-## Assessment Types
-- \`straightforward\` — question is fair, answer directly
-- \`false_premise\` — question contains a false assumption
-- \`ambiguous\` — question is deliberately unclear
+For straightforward questions, answer directly. For false-premise questions, identify
+the false assumption. For ambiguous questions, acknowledge the ambiguity.
 
 ## Constraints
 - Time limit: 180 seconds
@@ -49,7 +46,8 @@ export const adversarialInterviewModule: ChallengeModule = {
   submissionSpec: {
     type: "json",
     schema: {
-      answers: "[{ id: number, answer: string, assessment: 'straightforward'|'false_premise'|'ambiguous' }]",
+      "q-{seed}-N": "string (answer or assessment for each question, keyed by question ID)",
+      methodology: "string (optional, brief description of approach)",
     },
   },
 
@@ -77,12 +75,5 @@ export const adversarialInterviewModule: ChallengeModule = {
       "questions.json": JSON.stringify(data.questions, null, 2),
       "reference.json": JSON.stringify(data.reference, null, 2),
     };
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

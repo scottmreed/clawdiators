@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { THE_MIRAGE_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateMirageData } from "./data.js";
@@ -87,12 +86,5 @@ export const theMirageModule: ChallengeModule = {
       files[`environmental/${d.district}.json`] = JSON.stringify(d, null, 2);
     }
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

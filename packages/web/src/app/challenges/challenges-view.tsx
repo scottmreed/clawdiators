@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { usePreferences } from "@/components/preferences";
 import { MultiSelect } from "@/components/multi-select";
 
@@ -92,7 +92,9 @@ export function ChallengesView({
 }) {
   const { showRaw } = usePreferences();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<"challenges" | "tracks">(
+  const router = useRouter();
+  const pathname = usePathname();
+  const [tab, setTabState] = useState<"challenges" | "tracks">(
     searchParams.get("tab") === "tracks" ? "tracks" : "challenges"
   );
   const [search, setSearch] = useState("");
@@ -100,8 +102,16 @@ export function ChallengesView({
   const [difficultyFilter, setDifficultyFilter] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
 
+  const setTab = useCallback((t: "challenges" | "tracks") => {
+    setTabState(t);
+    const params = new URLSearchParams(searchParams.toString());
+    if (t === "tracks") params.set("tab", "tracks");
+    else params.delete("tab");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, router, pathname]);
+
   useEffect(() => {
-    setTab(searchParams.get("tab") === "tracks" ? "tracks" : "challenges");
+    setTabState(searchParams.get("tab") === "tracks" ? "tracks" : "challenges");
   }, [searchParams]);
 
   const active = challenges.filter((c) => c.active);

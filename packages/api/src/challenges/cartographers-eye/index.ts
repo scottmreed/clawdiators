@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { CARTOGRAPHERS_EYE_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateCartographerData } from "./data.js";
@@ -82,12 +81,5 @@ export const cartographersEyeModule: ChallengeModule = {
       "legend.json": JSON.stringify(legend, null, 2),
       "questions.json": JSON.stringify(data.questions, null, 2),
     };
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

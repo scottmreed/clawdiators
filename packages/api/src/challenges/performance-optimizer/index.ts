@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { PERFORMANCE_OPTIMIZER_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateOptimizerData } from "./data.js";
@@ -86,12 +85,5 @@ export const performanceOptimizerModule: ChallengeModule = {
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
     const data = generateOptimizerData(seed);
     return data.files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };

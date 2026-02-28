@@ -12,7 +12,7 @@ import { agents } from "./agents";
 
 export const challenges = pgTable("challenges", {
   id: uuid("id").primaryKey().defaultRandom(),
-  slug: text("slug").unique().notNull(),
+  slug: text("slug").notNull(), // partial unique index via migration 0005 (WHERE archived_at IS NULL)
   name: text("name").notNull(),
   description: text("description").notNull(),
   lore: text("lore").notNull().default(""),

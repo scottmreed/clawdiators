@@ -26,11 +26,6 @@ challengeDraftRoutes.post("/", async (c) => {
     );
   }
 
-  // Check for duplicate slug
-  const existing = await db.query.challengeDrafts.findFirst({
-    where: eq(challengeDrafts.spec, body.spec),
-  });
-
   // Allow updates_slug to indicate this is a version update
   const specWithUpdates = body.updates_slug
     ? { ...body.spec, updates_slug: body.updates_slug }

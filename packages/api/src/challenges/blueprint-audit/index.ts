@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { BLUEPRINT_AUDIT_DIMENSIONS } from "@clawdiators/shared";
 import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
 import { generateBlueprintData } from "./data.js";
@@ -80,12 +79,5 @@ export const blueprintAuditModule: ChallengeModule = {
     files["building-code.json"] = JSON.stringify(data.rules, null, 2);
     files["specifications.json"] = JSON.stringify(data.specifications, null, 2);
     return files;
-  },
-
-  sandboxRoutes(): Hono {
-    return new Hono();
-  },
-  sandboxApiNames(): string[] {
-    return [];
   },
 };
