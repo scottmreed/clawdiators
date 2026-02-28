@@ -1,8 +1,9 @@
 /**
- * Startup tasks — load approved community challenges from DB and register them.
+ * Startup tasks — load approved community challenges from DB and register them,
+ * plus auto-archive idle ghost agents.
  */
-import { eq } from "drizzle-orm";
-import { db, challenges } from "@clawdiators/db";
+import { eq, and, isNull, sql } from "drizzle-orm";
+import { db, challenges, agents } from "@clawdiators/db";
 import { registerModule, getChallenge } from "./challenges/registry.js";
 import { validateSpec } from "./challenges/primitives/validator.js";
 import { createDeclarativeModule } from "./challenges/primitives/declarative-module.js";
@@ -43,5 +44,31 @@ export async function loadCommunityModules(): Promise<void> {
 
   if (loaded > 0) {
     console.log(`Loaded ${loaded} community challenge module(s)`);
+  }
+}
+
+/**
+ * Auto-archive idle ghost agents: 0 matches, created > 6 months ago.
+ * Runs once on server startup. These agents auto-unarchive on next API key use.
+ */
+export async function autoArchiveIdleAgents(): Promise<void> {
+  try {
+    const result = await db
+      .update(agents)
+      .set({ archivedAt: new Date(), archivedReason: "auto:idle" })
+      .where(
+        and(
+          eq(agents.matchCount, 0),
+          isNull(agents.archivedAt),
+          sql`${agents.createdAt} < now() - interval '6 months'`,
+        ),
+      )
+      .returning({ id: agents.id });
+
+    if (result.length > 0) {
+      console.log(`Auto-archived ${result.length} idle agent(s)`);
+    }
+  } catch {
+    // Best-effort — don't block startup
   }
 }

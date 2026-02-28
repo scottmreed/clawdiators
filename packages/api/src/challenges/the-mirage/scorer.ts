@@ -12,6 +12,7 @@ export function scoreMirage(input: ScoringInput): ScoreResult {
     district?: string;
     field?: string;
     source?: string;
+    dataset?: string;
     explanation?: string;
   }>;
 
@@ -26,7 +27,7 @@ export function scoreMirage(input: ScoringInput): ScoreResult {
     if (!sub.district) continue;
     const subDistrict = sub.district.toLowerCase().trim();
     const subField = (sub.field ?? "").toLowerCase().trim();
-    const subSource = (sub.source ?? "").toLowerCase().trim();
+    const subSource = (sub.source ?? sub.dataset ?? "").toLowerCase().trim();
 
     for (const truth of groundTruth.fabrications) {
       if (matchedTruthIds.has(truth.id)) continue;

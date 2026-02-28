@@ -1,33 +1,41 @@
 import { REEF_REFACTOR_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateRefactorData } from "./data.js";
+import type { RefactorGroundTruth } from "./data.js";
 import { scoreRefactor } from "./scorer.js";
 
 const CHALLENGE_MD_TEMPLATE = `# Challenge: The Reef Refactor
 
 ## Objective
-Five broken functions, each with a known bug and test cases. Determine the correct
-output for each test case — no code execution needed, just analysis.
+Five broken functions, each with a known bug and test cases. Determine what the
+correct (unfixed) function would output for each test case.
 
 ## Workspace Contents
 - \`functions/\` — Directory with one JSON file per broken function containing:
   - Function name, code, bug description, and test cases
-- \`tests/\` — Directory with expected test case format per function
 
 ## Submission Format
 Submit a JSON object mapping each function ID to its corrected test outputs:
 \`\`\`json
 {
   "answer": {
-    "fn_id_1": [output1, output2, ...],
-    "fn_id_2": [output1, output2, ...]
+    "fn-{seed}-0": [output1, output2, ...],
+    "fn-{seed}-1": [output1, output2, ...]
   }
 }
 \`\`\`
 
+Each value must be an array of outputs, one per test case, in the same order as
+the test cases in the corresponding JSON file.
+
+## Scoring
+- **Correctness (50%)** — fraction of test cases with the correct output
+- **Speed (20%)** — faster submissions score higher (linear decay over 120 s)
+- **Methodology (15%)** — include a top-level \`methodology\`, \`reasoning\`, or \`approach\` key
+- **Coverage (15%)** — fraction of functions attempted (key present in submission)
+
 ## Constraints
 - Time limit: 120 seconds
-- Do not fix the code — determine what the correct output should be
 `;
 
 export const reefRefactorModule: ChallengeModule = {
@@ -63,6 +71,43 @@ export const reefRefactorModule: ChallengeModule = {
 
   score(input: ScoringInput): ScoreResult {
     return scoreRefactor(input);
+  },
+
+  validateSubmission(submission: Record<string, unknown>, groundTruth: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+    const gt = groundTruth as unknown as RefactorGroundTruth;
+    const expectedIds = gt.functions.map(f => f.id);
+
+    // Check for values that are not arrays
+    for (const id of expectedIds) {
+      const val = submission[id];
+      if (val !== undefined && val !== null && !Array.isArray(val)) {
+        warnings.push({
+          severity: "error",
+          field: id,
+          message: `Value for "${id}" is not an array. The scorer expects an array of outputs, e.g. [42, 10, 0]. Got ${typeof val}.`,
+        });
+      }
+    }
+
+    // Check for missing function IDs
+    const found = expectedIds.filter(id => submission[id] !== undefined);
+    const missing = expectedIds.filter(id => submission[id] === undefined);
+    if (found.length === 0) {
+      warnings.push({
+        severity: "error",
+        field: "answer",
+        message: `No function IDs found in submission. Expected keys like "${expectedIds[0]}", "${expectedIds[1]}", etc. Found keys: [${Object.keys(submission).join(", ")}].`,
+      });
+    } else if (missing.length > 0) {
+      warnings.push({
+        severity: "warning",
+        field: "coverage",
+        message: `Missing ${missing.length} of ${expectedIds.length} function IDs: ${missing.join(", ")}.`,
+      });
+    }
+
+    return warnings;
   },
 
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {

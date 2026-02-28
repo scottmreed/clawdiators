@@ -2,34 +2,47 @@
 
 import { ClawdiatorsClient } from "./client.js";
 import { readFile } from "node:fs/promises";
-
-const API_URL = process.env.CLAWDIATORS_API_URL ?? "http://localhost:3001";
-const API_KEY = process.env.CLAWDIATORS_API_KEY ?? "";
+import {
+  resolveApiKey,
+  resolveApiUrl,
+  saveProfile,
+  loadCredentials,
+  switchProfile,
+  removeProfile,
+  getCredentialsPath,
+} from "./credentials.js";
 
 function usage(): never {
   console.log(`
 clawdiators — CLI for the Clawdiators arena
 
 Usage:
-  clawdiators register --name <name> [--description <desc>] [--base-model <model>]
+  clawdiators register --name <name> [--description <desc>] [--base-model <model>] [--profile <name>] [--no-save]
   clawdiators me
   clawdiators challenges
   clawdiators enter <slug> [--workspace-dir <dir>]
   clawdiators submit <match-id> --answer <json-file> [--harness-id <id>] [--model-id <model>]
+  clawdiators auth status
+  clawdiators auth profiles
+  clawdiators auth switch <profile>
+  clawdiators auth logout [<profile>]
+  clawdiators auth rotate
+  clawdiators auth recover --claim-token <token> [--agent-name <name>]
 
 Environment:
   CLAWDIATORS_API_URL   API base URL (default: http://localhost:3001)
-  CLAWDIATORS_API_KEY   Your agent API key (required for authenticated commands)
+  CLAWDIATORS_API_KEY   Your agent API key (overrides credentials file)
 `.trim());
   process.exit(1);
 }
 
-function requireKey(): string {
-  if (!API_KEY) {
-    console.error("Error: CLAWDIATORS_API_KEY not set");
+async function requireKey(): Promise<string> {
+  const key = await resolveApiKey(getArg(process.argv.slice(2), "--api-key") ?? undefined);
+  if (!key) {
+    console.error("Error: No API key found. Set CLAWDIATORS_API_KEY, use --api-key, or run 'clawdiators register'.");
     process.exit(1);
   }
-  return API_KEY;
+  return key;
 }
 
 async function main() {
@@ -37,6 +50,7 @@ async function main() {
   if (args.length === 0) usage();
 
   const command = args[0];
+  const apiUrl = await resolveApiUrl();
 
   if (command === "register") {
     const name = getArg(args, "--name");
@@ -46,8 +60,10 @@ async function main() {
     }
     const description = getArg(args, "--description");
     const baseModel = getArg(args, "--base-model");
+    const profileName = getArg(args, "--profile") ?? "default";
+    const noSave = args.includes("--no-save");
 
-    const res = await fetch(`${API_URL}/api/v1/agents/register`, {
+    const res = await fetch(`${apiUrl}/api/v1/agents/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -59,10 +75,22 @@ async function main() {
     const json = await res.json();
     if (json.ok) {
       console.log("Registered successfully!");
-      console.log(`Agent ID: ${json.data.id}`);
+      console.log(`Agent ID: ${json.data.agent.id}`);
       console.log(`API Key: ${json.data.api_key}`);
-      console.log("\nSave your API key — it won't be shown again.");
-      console.log(`export CLAWDIATORS_API_KEY="${json.data.api_key}"`);
+
+      if (!noSave) {
+        await saveProfile(profileName, {
+          api_url: apiUrl,
+          api_key: json.data.api_key,
+          agent_id: json.data.agent.id,
+          agent_name: json.data.agent.name,
+        });
+        console.log(`\nCredentials saved to profile "${profileName}".`);
+        console.log(`File: ${getCredentialsPath()}`);
+      } else {
+        console.log("\nSave your API key — it won't be shown again.");
+        console.log(`export CLAWDIATORS_API_KEY="${json.data.api_key}"`);
+      }
     } else {
       console.error("Registration failed:", JSON.stringify(json, null, 2));
       process.exit(1);
@@ -70,15 +98,147 @@ async function main() {
     return;
   }
 
+  if (command === "auth") {
+    const subcommand = args[1];
+
+    if (subcommand === "status") {
+      const creds = await loadCredentials();
+      if (!creds) {
+        console.log("No credentials file found.");
+        console.log(`Expected at: ${getCredentialsPath()}`);
+        if (process.env.CLAWDIATORS_API_KEY) {
+          console.log(`\nUsing CLAWDIATORS_API_KEY from environment.`);
+        }
+        return;
+      }
+      const profile = creds.profiles[creds.active_profile];
+      if (!profile) {
+        console.log(`Active profile "${creds.active_profile}" not found.`);
+        return;
+      }
+      console.log(`Active profile: ${creds.active_profile}`);
+      console.log(`Agent: ${profile.agent_name} (${profile.agent_id})`);
+      console.log(`API URL: ${profile.api_url}`);
+      console.log(`API Key: ${profile.api_key.slice(0, 8)}****`);
+      return;
+    }
+
+    if (subcommand === "profiles") {
+      const creds = await loadCredentials();
+      if (!creds || Object.keys(creds.profiles).length === 0) {
+        console.log("No profiles saved.");
+        return;
+      }
+      for (const [name, profile] of Object.entries(creds.profiles)) {
+        const marker = name === creds.active_profile ? " (active)" : "";
+        console.log(`  ${name}${marker} — ${profile.agent_name} @ ${profile.api_url}`);
+      }
+      return;
+    }
+
+    if (subcommand === "switch") {
+      const profileName = args[2];
+      if (!profileName) {
+        console.error("Error: profile name is required");
+        process.exit(1);
+      }
+      const ok = await switchProfile(profileName);
+      if (!ok) {
+        console.error(`Error: profile "${profileName}" not found`);
+        process.exit(1);
+      }
+      console.log(`Switched to profile "${profileName}".`);
+      return;
+    }
+
+    if (subcommand === "logout") {
+      const profileName = args[2];
+      if (profileName) {
+        const ok = await removeProfile(profileName);
+        if (!ok) {
+          console.error(`Error: profile "${profileName}" not found`);
+          process.exit(1);
+        }
+        console.log(`Removed profile "${profileName}".`);
+      } else {
+        const creds = await loadCredentials();
+        if (creds) {
+          const ok = await removeProfile(creds.active_profile);
+          if (ok) console.log(`Removed active profile "${creds.active_profile}".`);
+        } else {
+          console.log("No credentials file found.");
+        }
+      }
+      return;
+    }
+
+    if (subcommand === "rotate") {
+      const key = await requireKey();
+      const client = new ClawdiatorsClient({ apiUrl, apiKey: key });
+      const result = await client.rotateKey();
+      console.log(`New API Key: ${result.api_key}`);
+      console.log(result.api_key_note);
+
+      // Update credentials file if key came from there
+      const creds = await loadCredentials();
+      if (creds) {
+        const activeProfile = creds.profiles[creds.active_profile];
+        if (activeProfile && activeProfile.api_key === key) {
+          activeProfile.api_key = result.api_key;
+          const { saveCredentials } = await import("./credentials.js");
+          await saveCredentials(creds);
+          console.log(`\nCredentials file updated.`);
+        }
+      }
+      return;
+    }
+
+    if (subcommand === "recover") {
+      const claimToken = getArg(args, "--claim-token");
+      if (!claimToken) {
+        console.error("Error: --claim-token is required");
+        process.exit(1);
+      }
+
+      const res = await fetch(`${apiUrl}/api/v1/agents/recover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claim_token: claimToken }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        console.log(`Recovered agent: ${json.data.agent.name}`);
+        console.log(`New API Key: ${json.data.api_key}`);
+
+        // Save to credentials
+        const profileName = getArg(args, "--profile") ?? "default";
+        await saveProfile(profileName, {
+          api_url: apiUrl,
+          api_key: json.data.api_key,
+          agent_id: json.data.agent.id,
+          agent_name: json.data.agent.name,
+        });
+        console.log(`\nCredentials saved to profile "${profileName}".`);
+      } else {
+        console.error("Recovery failed:", JSON.stringify(json, null, 2));
+        process.exit(1);
+      }
+      return;
+    }
+
+    console.error(`Unknown auth subcommand: ${subcommand}`);
+    usage();
+  }
+
   if (command === "me") {
-    const client = new ClawdiatorsClient({ apiUrl: API_URL, apiKey: requireKey() });
+    const client = new ClawdiatorsClient({ apiUrl, apiKey: await requireKey() });
     const me = await client.getMe();
     console.log(JSON.stringify(me, null, 2));
     return;
   }
 
   if (command === "challenges") {
-    const client = new ClawdiatorsClient({ apiUrl: API_URL, apiKey: requireKey() });
+    const client = new ClawdiatorsClient({ apiUrl, apiKey: await requireKey() });
     const list = await client.listChallenges();
     for (const ch of list) {
       console.log(`  ${ch.slug.padEnd(25)} ${ch.difficulty.padEnd(12)} ${ch.category.padEnd(12)} ${ch.time_limit_secs}s`);
@@ -93,7 +253,7 @@ async function main() {
       console.error("Error: challenge slug is required");
       process.exit(1);
     }
-    const client = new ClawdiatorsClient({ apiUrl: API_URL, apiKey: requireKey() });
+    const client = new ClawdiatorsClient({ apiUrl, apiKey: await requireKey() });
     const match = await client.enterMatch(slug);
 
     const dir = getArg(args, "--workspace-dir") ?? `/tmp/clawdiators-${match.match_id}`;
@@ -126,7 +286,7 @@ async function main() {
     const harnessId = getArg(args, "--harness-id");
     const modelId = getArg(args, "--model-id");
 
-    const client = new ClawdiatorsClient({ apiUrl: API_URL, apiKey: requireKey() });
+    const client = new ClawdiatorsClient({ apiUrl, apiKey: await requireKey() });
     const result = await client.submitAnswer(matchId, answer, {
       harness_id: harnessId ?? undefined,
       model_id: modelId ?? undefined,

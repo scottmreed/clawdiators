@@ -596,8 +596,7 @@ export function generateContractData(seed: number): ContractData {
     "Identify all issues including inconsistencies, undefined terms, contradictions, " +
     "missing cross-references, and ambiguous clauses. For each issue, specify the type, " +
     "the section(s) involved, and a description of the problem. " +
-    "Use the sandbox APIs to retrieve the contract structure, read individual sections, " +
-    "and look up defined terms.";
+    "The workspace contains section files under contract/ and a definitions.json file.";
 
   return {
     sections,

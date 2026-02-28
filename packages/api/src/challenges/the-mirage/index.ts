@@ -1,5 +1,5 @@
 import { THE_MIRAGE_DIMENSIONS } from "@clawdiators/shared";
-import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult } from "../types.js";
+import type { ChallengeModule, ChallengeData, ScoringInput, ScoreResult, SubmissionWarning } from "../types.js";
 import { generateMirageData } from "./data.js";
 import { scoreMirage } from "./scorer.js";
 
@@ -21,14 +21,22 @@ internally consistent, but cross-referencing reveals fabricated data points.
     "fabrications": [
       {
         "district": "district_name",
-        "dataset": "census|financial|environmental",
+        "source": "census|financial|environmental",
         "field": "specific field name",
-        "reason": "explanation of why this is fabricated"
+        "explanation": "explanation of why this is fabricated"
       }
     ]
   }
 }
 \`\`\`
+
+## Scoring Breakdown
+| Dimension | Weight | Description |
+|---|---|---|
+| Detection | 40% | Of the ground-truth fabrications, how many did you find? Matched by district + field or district + source. |
+| Precision | 25% | Of your submitted fabrications, how many are real? Avoid false positives. |
+| Speed | 15% | Faster submissions score higher (linear decay over the 240s time limit). |
+| Thoroughness | 20% | Did you check all three data sources? Full marks for referencing census, financial, and environmental. |
 
 ## Constraints
 - Time limit: 240 seconds
@@ -48,7 +56,7 @@ export const theMirageModule: ChallengeModule = {
   submissionSpec: {
     type: "json",
     schema: {
-      fabrications: "[{ district: string, dataset: string, field: string, reason: string }]",
+      fabrications: "[{ district: string, source: string, field: string, explanation: string }]",
     },
   },
 
@@ -70,12 +78,52 @@ export const theMirageModule: ChallengeModule = {
     return scoreMirage(input);
   },
 
+  validateSubmission(submission: Record<string, unknown>): SubmissionWarning[] {
+    const warnings: SubmissionWarning[] = [];
+
+    if (!Array.isArray(submission.fabrications)) {
+      warnings.push({
+        severity: "error",
+        field: "fabrications",
+        message: `Expected "fabrications" to be an array, got ${typeof submission.fabrications}. Submit an array of fabrication objects.`,
+      });
+      return warnings;
+    }
+
+    for (let i = 0; i < submission.fabrications.length; i++) {
+      const entry = submission.fabrications[i] as Record<string, unknown>;
+      if (!entry.district) {
+        warnings.push({
+          severity: "error",
+          field: `fabrications[${i}].district`,
+          message: `Fabrication at index ${i} is missing "district". Each entry must include the district name.`,
+        });
+      }
+      if (!entry.field) {
+        warnings.push({
+          severity: "error",
+          field: `fabrications[${i}].field`,
+          message: `Fabrication at index ${i} is missing "field". Each entry must include the suspect field name.`,
+        });
+      }
+      if (!entry.source) {
+        warnings.push({
+          severity: "warning",
+          field: `fabrications[${i}].source`,
+          message: `Fabrication at index ${i} is missing "source". Each entry should specify the data source (census, financial, or environmental).`,
+        });
+      }
+    }
+
+    return warnings;
+  },
+
   generateWorkspace(seed: number, _config: Record<string, unknown>): Record<string, string> {
     const data = generateMirageData(seed);
     const files: Record<string, string> = {};
-    const census = data.census as Array<Record<string, unknown>>;
-    const financial = data.financial as Array<Record<string, unknown>>;
-    const environmental = data.environmental as Array<Record<string, unknown>>;
+    const census = data.census as unknown as Array<Record<string, unknown>>;
+    const financial = data.financial as unknown as Array<Record<string, unknown>>;
+    const environmental = data.environmental as unknown as Array<Record<string, unknown>>;
     for (const d of census) {
       files[`census/${d.district}.json`] = JSON.stringify(d, null, 2);
     }
