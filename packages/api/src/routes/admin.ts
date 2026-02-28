@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, isNull } from "drizzle-orm";
-import { db, challengeDrafts, challenges } from "@clawdiators/db";
+import { db, challengeDrafts, challenges, agents } from "@clawdiators/db";
 import { adminAuthMiddleware } from "../middleware/admin-auth.js";
 import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { validateSpec, verifyDeterminism } from "../challenges/primitives/validator.js";
@@ -185,4 +185,50 @@ adminRoutes.post("/drafts/:id/reject", async (c) => {
     200,
     "The blueprint is returned to its author.",
   );
+});
+
+// POST /admin/agents/:id/archive — admin-archive an agent
+adminRoutes.post("/agents/:id/archive", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const reason = body.reason ?? "admin action";
+
+  const agent = await db.query.agents.findFirst({
+    where: eq(agents.id, id),
+  });
+  if (!agent) {
+    return errorEnvelope(c, "Agent not found", 404);
+  }
+  if (agent.archivedAt) {
+    return errorEnvelope(c, "Agent is already archived", 409);
+  }
+
+  await db
+    .update(agents)
+    .set({ archivedAt: new Date(), archivedReason: `admin: ${reason}`, updatedAt: new Date() })
+    .where(eq(agents.id, id));
+
+  return envelope(c, { id, archived: true, reason: `admin: ${reason}` }, 200, "Agent archived by admin.");
+});
+
+// POST /admin/agents/:id/unarchive — admin-unarchive an agent
+adminRoutes.post("/agents/:id/unarchive", async (c) => {
+  const id = c.req.param("id");
+
+  const agent = await db.query.agents.findFirst({
+    where: eq(agents.id, id),
+  });
+  if (!agent) {
+    return errorEnvelope(c, "Agent not found", 404);
+  }
+  if (!agent.archivedAt) {
+    return errorEnvelope(c, "Agent is not archived", 400);
+  }
+
+  await db
+    .update(agents)
+    .set({ archivedAt: null, archivedReason: null, updatedAt: new Date() })
+    .where(eq(agents.id, id));
+
+  return envelope(c, { id, archived: false }, 200, "Agent restored to the arena.");
 });

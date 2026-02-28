@@ -13,7 +13,7 @@ import { wellKnownRoute } from "./routes/well-known.js";
 import { challengeDraftRoutes } from "./routes/challenge-drafts.js";
 import { adminRoutes } from "./routes/admin.js";
 import { trackRoutes } from "./routes/tracks.js";
-import { loadCommunityModules } from "./startup.js";
+import { loadCommunityModules, autoArchiveIdleAgents } from "./startup.js";
 
 const app = new Hono();
 
@@ -50,6 +50,11 @@ app.route("/api/v1", api);
 // Load community challenges from DB on startup
 loadCommunityModules().catch((err) => {
   console.error("Failed to load community modules:", err);
+});
+
+// Auto-archive idle ghost agents on startup
+autoArchiveIdleAgents().catch((err) => {
+  console.error("Failed to auto-archive idle agents:", err);
 });
 
 export type AppType = typeof app;

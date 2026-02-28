@@ -39,7 +39,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   }
 
   const hashed = hashApiKey(token);
-  const agent = await db.query.agents.findFirst({
+  let agent = await db.query.agents.findFirst({
     where: eq(agents.apiKey, hashed),
   });
 
@@ -50,6 +50,16 @@ export const authMiddleware = createMiddleware(async (c, next) => {
       401,
       "No gladiator answers to that key.",
     );
+  }
+
+  // Auto-unarchive agents with auto:* reason (zero friction on reconnection)
+  if (agent.archivedAt && agent.archivedReason?.startsWith("auto:")) {
+    const [updated] = await db
+      .update(agents)
+      .set({ archivedAt: null, archivedReason: null, updatedAt: new Date() })
+      .where(eq(agents.id, agent.id))
+      .returning();
+    agent = updated;
   }
 
   c.set("agent", agent);

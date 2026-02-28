@@ -27,6 +27,16 @@ matchRoutes.post(
     const agent = c.get("agent");
     const { challenge_slug } = c.req.valid("json");
 
+    // Reject archived agents
+    if (agent.archivedAt) {
+      return errorEnvelope(
+        c,
+        "Archived agents cannot enter matches. Unarchive first.",
+        403,
+        "The arena does not welcome ghosts. Unarchive yourself to return.",
+      );
+    }
+
     // Find challenge
     const challenge = await db.query.challenges.findFirst({
       where: eq(challenges.slug, challenge_slug),
@@ -59,19 +69,28 @@ matchRoutes.post(
           .set({ status: "expired" })
           .where(eq(matches.id, existingActive.id));
       } else {
+        // Look up the challenge for the *existing* match, not the requested one
+        const existingChallenge = await db.query.challenges.findFirst({
+          where: eq(challenges.id, existingActive.challengeId),
+        });
+        const existingMod = existingChallenge ? getChallenge(existingChallenge.slug) : null;
         return envelope(c, {
           match_id: existingActive.id,
           bout_name: existingActive.boutName,
           status: "active",
           objective: existingActive.objective,
-          time_limit_secs: challenge.timeLimitSecs,
+          time_limit_secs: existingChallenge?.timeLimitSecs ?? challenge.timeLimitSecs,
           expires_at: existingActive.expiresAt,
-          match_type: challenge.matchType,
-          workspace_url: `/api/v1/challenges/${challenge.slug}/workspace?seed=${existingActive.seed}`,
-          challenge_md: mod.workspaceSpec?.challengeMd ?? null,
-          submission_spec: mod.submissionSpec ?? null,
+          match_type: existingChallenge?.matchType ?? challenge.matchType,
+          workspace_url: `/api/v1/challenges/${existingChallenge?.slug ?? challenge.slug}/workspace?seed=${existingActive.seed}`,
+          challenge_md: existingMod?.workspaceSpec?.challengeMd ?? null,
+          submission_spec: existingMod?.submissionSpec ?? null,
           submit_url: `/api/v1/matches/${existingActive.id}/submit`,
-          note: "You already have an active match. Complete or wait for it to expire.",
+          challenge: existingChallenge ? {
+            slug: existingChallenge.slug,
+            name: existingChallenge.name,
+          } : undefined,
+          note: `You already have an active match for "${existingChallenge?.name ?? "unknown"}". Complete or wait for it to expire.`,
         }, 200, "Your current bout awaits, gladiator. Do not keep the crowd waiting.");
       }
     }
@@ -237,6 +256,11 @@ matchRoutes.post(
       apiCallCount: match.apiCallLog.length,
       checkpoints: match.checkpoints,
     };
+    // Validate submission structure and collect warnings for the agent
+    const submissionWarnings = mod.validateSubmission
+      ? mod.validateSubmission(answer, data.groundTruth)
+      : [];
+
     const { result: evalResult, log: evaluationLog } = await evaluate(mod, scoringInput);
     const { breakdown } = evalResult;
 
@@ -435,6 +459,7 @@ matchRoutes.post(
         title: newTitle,
         flavour_text: flavourText,
         evaluation_log: evaluationLog,
+        submission_warnings: submissionWarnings.length > 0 ? submissionWarnings : undefined,
         reflect_url: `/api/v1/matches/${match.id}/reflect`,
       },
       200,

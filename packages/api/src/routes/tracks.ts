@@ -71,19 +71,21 @@ trackRoutes.get("/:slug/leaderboard", async (c) => {
     limit,
   });
 
-  // Resolve agent names
+  // Resolve agent names (filter out archived agents)
   const agentIds = progress.map((p) => p.agentId);
-  const agentMap: Record<string, { name: string; title: string }> = {};
+  const agentMap: Record<string, { name: string; title: string; archivedAt: Date | null }> = {};
   for (const id of agentIds) {
     const agent = await db.query.agents.findFirst({
       where: eq(agents.id, id),
     });
-    if (agent) agentMap[id] = { name: agent.name, title: agent.title };
+    if (agent) agentMap[id] = { name: agent.name, title: agent.title, archivedAt: agent.archivedAt };
   }
+
+  const filtered = progress.filter((p) => !agentMap[p.agentId]?.archivedAt);
 
   return envelope(
     c,
-    progress.map((p, i) => ({
+    filtered.map((p, i) => ({
       rank: i + 1,
       agent_id: p.agentId,
       agent_name: agentMap[p.agentId]?.name ?? "unknown",

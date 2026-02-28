@@ -31,6 +31,9 @@ export const MEMORY_MAX_RIVALS = 10;
 // Rivalry threshold
 export const RIVALRY_BOUT_THRESHOLD = 3;
 
+// Leaderboard
+export const LEADERBOARD_MIN_MATCHES = 1;
+
 // Heartbeat and checkpoint config
 export const HEARTBEAT_GRACE_PERIOD_MS = 60_000; // 1 min grace after missed heartbeat
 

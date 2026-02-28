@@ -15,11 +15,12 @@
     "studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@clawdiators/shared": "workspace:*",
     "drizzle-orm": "^0.38.0",
-    "postgres": "^3.4.0",
-    "@clawdiators/shared": "workspace:*"
+    "postgres": "^3.4.0"
   },
   "devDependencies": {
+    "@types/node": "25.3.0",
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"

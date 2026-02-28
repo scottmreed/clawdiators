@@ -166,7 +166,7 @@ challengeRoutes.get("/:slug/workspace", async (c) => {
   try {
     const archive = buildWorkspaceArchive(mod, seed, challenge.config);
 
-    return new Response(archive, {
+    return new Response(new Uint8Array(archive), {
       status: 200,
       headers: {
         "Content-Type": "application/gzip",
@@ -242,6 +242,7 @@ challengeRoutes.get("/:slug/leaderboard", async (c) => {
       and(
         eq(matches.challengeId, challenge.id),
         eq(matches.status, "completed"),
+        isNull(agents.archivedAt),
       ),
     )
     .groupBy(matches.agentId, agents.name, agents.title)

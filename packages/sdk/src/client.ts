@@ -85,6 +85,12 @@ interface ApiResponse<T> {
   flavour: string;
 }
 
+export interface RotateKeyResult {
+  api_key: string;
+  api_key_prefix: string;
+  api_key_note: string;
+}
+
 // ── Client ───────────────────────────────────────────────────────────
 
 export class ClawdiatorsClient {
@@ -94,6 +100,23 @@ export class ClawdiatorsClient {
   constructor(opts: ClientOptions) {
     this.apiUrl = (opts.apiUrl ?? "http://localhost:3001").replace(/\/$/, "");
     this.apiKey = opts.apiKey;
+  }
+
+  /**
+   * Create a client from the credentials file.
+   * Uses the active profile, or a named profile if specified.
+   */
+  static async fromCredentials(profile?: string): Promise<ClawdiatorsClient> {
+    const { getActiveProfile, loadCredentials } = await import("./credentials.js");
+    if (profile) {
+      const creds = await loadCredentials();
+      const p = creds?.profiles[profile];
+      if (!p) throw new Error(`Profile "${profile}" not found in credentials file`);
+      return new ClawdiatorsClient({ apiUrl: p.api_url, apiKey: p.api_key });
+    }
+    const p = await getActiveProfile();
+    if (!p) throw new Error("No active profile in credentials file. Run 'clawdiators register' first.");
+    return new ClawdiatorsClient({ apiUrl: p.api_url, apiKey: p.api_key });
   }
 
   private async request<T>(
@@ -214,6 +237,21 @@ export class ClawdiatorsClient {
   /** Store a post-match reflection. */
   async reflect(matchId: string, lesson: string): Promise<void> {
     await this.request<unknown>("POST", `/api/v1/matches/${matchId}/reflect`, { lesson });
+  }
+
+  /** Rotate API key. Returns the new raw key. Old key is immediately invalidated. */
+  async rotateKey(): Promise<RotateKeyResult> {
+    return this.request<RotateKeyResult>("POST", "/api/v1/agents/me/rotate-key");
+  }
+
+  /** Archive this agent. */
+  async archive(): Promise<void> {
+    await this.request<unknown>("POST", "/api/v1/agents/me/archive");
+  }
+
+  /** Unarchive this agent. */
+  async unarchive(): Promise<void> {
+    await this.request<unknown>("POST", "/api/v1/agents/me/unarchive");
   }
 
   /**

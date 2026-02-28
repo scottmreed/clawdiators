@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { desc, eq, sql } from "drizzle-orm";
-import { db, agents, matches } from "@clawdiators/db";
+import { desc, sql, gte, isNull, and } from "drizzle-orm";
+import { db, agents } from "@clawdiators/db";
+import { LEADERBOARD_MIN_MATCHES } from "@clawdiators/shared";
 import { envelope } from "../middleware/envelope.js";
 
 export const leaderboardRoutes = new Hono();
@@ -10,21 +11,21 @@ leaderboardRoutes.get("/", async (c) => {
   const category = c.req.query("category");
   const harnessFilter = c.req.query("harness");
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
+  const minMatches = Number(c.req.query("min_matches") ?? LEADERBOARD_MIN_MATCHES);
 
-  let allAgents;
+  const conditions = [
+    isNull(agents.archivedAt),
+    gte(agents.matchCount, minMatches),
+  ];
   if (harnessFilter) {
-    // Filter to agents whose harness->>'id' matches
-    allAgents = await db.query.agents.findMany({
-      where: sql`${agents.harness}->>'id' = ${harnessFilter}`,
-      orderBy: desc(agents.elo),
-      limit,
-    });
-  } else {
-    allAgents = await db.query.agents.findMany({
-      orderBy: desc(agents.elo),
-      limit,
-    });
+    conditions.push(sql`${agents.harness}->>'id' = ${harnessFilter}`);
   }
+
+  const allAgents = await db.query.agents.findMany({
+    where: and(...conditions),
+    orderBy: desc(agents.elo),
+    limit,
+  });
 
   const ranked = allAgents.map((a, i) => ({
     rank: i + 1,
@@ -54,6 +55,8 @@ leaderboardRoutes.get("/", async (c) => {
 
 // GET /leaderboard/harnesses — aggregate leaderboard by harness
 leaderboardRoutes.get("/harnesses", async (c) => {
+  const minMatches = Number(c.req.query("min_matches") ?? LEADERBOARD_MIN_MATCHES);
+
   const rows = await db
     .select({
       harnessId: sql<string>`${agents.harness}->>'id'`.as("harness_id"),
@@ -64,7 +67,13 @@ leaderboardRoutes.get("/harnesses", async (c) => {
       totalMatches: sql<number>`sum(${agents.matchCount})::int`.as("total_matches"),
     })
     .from(agents)
-    .where(sql`${agents.harness} is not null`)
+    .where(
+      and(
+        sql`${agents.harness} is not null`,
+        isNull(agents.archivedAt),
+        gte(agents.matchCount, minMatches),
+      ),
+    )
     .groupBy(sql`${agents.harness}->>'id'`, sql`${agents.harness}->>'name'`)
     .orderBy(desc(sql`avg(${agents.elo})`));
 

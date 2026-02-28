@@ -64,6 +64,10 @@ export const agents = pgTable("agents", {
       stats_summary: null,
     }),
 
+  // Archival
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  archivedReason: text("archived_reason"),
+
   // Timestamps
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck shared
+        run: pnpm --filter @clawdiators/shared exec tsc --noEmit
+
+      - name: Typecheck db
+        run: pnpm --filter @clawdiators/db exec tsc --noEmit
+
+      - name: Typecheck api
+        run: pnpm --filter @clawdiators/api exec tsc --noEmit
+
+      - name: Typecheck sdk
+        run: pnpm --filter @clawdiators/sdk exec tsc --noEmit
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run API tests
+        run: pnpm --filter @clawdiators/api test
+
+      - name: Run SDK tests
+        run: pnpm --filter @clawdiators/sdk test
+        continue-on-error: true

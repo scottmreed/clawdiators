@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { db, agents, challenges } from "@clawdiators/db";
+import { db, agents, matches, challenges } from "@clawdiators/db";
 import {
   API_KEY_PREFIX,
   API_KEY_BYTES,
@@ -50,12 +50,17 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
     where: eq(agents.name, body.name),
   });
   if (existing) {
-    return errorEnvelope(
-      c,
-      `Name "${body.name}" is already taken. Choose another.`,
-      409,
-      "That name echoes through the arena already.",
-    );
+    // Name reclamation: if existing agent is archived with 0 matches, hard-delete it
+    if (existing.archivedAt && existing.matchCount === 0) {
+      await db.delete(agents).where(eq(agents.id, existing.id));
+    } else {
+      return errorEnvelope(
+        c,
+        `Name "${body.name}" is already taken. Choose another.`,
+        409,
+        "That name echoes through the arena already.",
+      );
+    }
   }
 
   // Generate API key
@@ -146,8 +151,149 @@ agentRoutes.get("/me", authMiddleware, (c) => {
     rivals: agent.rivals,
     memory: agent.memory,
     claimed: !!agent.claimedBy,
+    archived_at: agent.archivedAt,
     created_at: agent.createdAt,
   });
+});
+
+// POST /agents/me/archive (authenticated)
+agentRoutes.post("/me/archive", authMiddleware, async (c) => {
+  const agent = c.get("agent");
+
+  if (agent.archivedAt) {
+    return errorEnvelope(c, "Agent is already archived", 409, "You've already stepped out of the arena.");
+  }
+
+  // Check for active matches
+  const activeMatch = await db.query.matches.findFirst({
+    where: and(eq(matches.agentId, agent.id), eq(matches.status, "active")),
+  });
+  if (activeMatch) {
+    return errorEnvelope(
+      c,
+      "Cannot archive while you have an active match. Complete or wait for it to expire.",
+      409,
+      "Finish your bout before you leave the arena.",
+    );
+  }
+
+  await db
+    .update(agents)
+    .set({ archivedAt: new Date(), archivedReason: "self", updatedAt: new Date() })
+    .where(eq(agents.id, agent.id));
+
+  return envelope(c, { archived: true }, 200, "You have left the arena. Return whenever you're ready.");
+});
+
+// POST /agents/me/unarchive (authenticated)
+agentRoutes.post("/me/unarchive", authMiddleware, async (c) => {
+  const agent = c.get("agent");
+
+  if (!agent.archivedAt) {
+    return errorEnvelope(c, "Agent is not archived", 400, "You're already in the arena.");
+  }
+
+  // Check if name was reclaimed by another agent
+  const nameHolder = await db.query.agents.findFirst({
+    where: eq(agents.name, agent.name),
+  });
+  if (nameHolder && nameHolder.id !== agent.id) {
+    return errorEnvelope(
+      c,
+      "Your name has been reclaimed by another agent. Contact an admin.",
+      409,
+      "Another gladiator has taken your name.",
+    );
+  }
+
+  await db
+    .update(agents)
+    .set({ archivedAt: null, archivedReason: null, updatedAt: new Date() })
+    .where(eq(agents.id, agent.id));
+
+  return envelope(c, { archived: false }, 200, "Welcome back to the arena, gladiator.");
+});
+
+// POST /agents/me/rotate-key (authenticated)
+agentRoutes.post("/me/rotate-key", authMiddleware, async (c) => {
+  const agent = c.get("agent");
+
+  const rawKey = API_KEY_PREFIX + randomBytes(API_KEY_BYTES).toString("hex");
+  const hashedKey = hashApiKey(rawKey);
+  const keyPrefix = rawKey.slice(0, 8) + "****";
+
+  await db
+    .update(agents)
+    .set({ apiKey: hashedKey, apiKeyPrefix: keyPrefix, updatedAt: new Date() })
+    .where(eq(agents.id, agent.id));
+
+  return envelope(
+    c,
+    {
+      api_key: rawKey,
+      api_key_prefix: keyPrefix,
+      api_key_note: "Old key is now invalid. Save this new key — it will never be shown again.",
+    },
+    200,
+    "Key rotated. The old key is dead; the new key lives.",
+  );
+});
+
+// POST /agents/recover (no auth, uses claim token)
+const recoverSchema = z.object({
+  claim_token: z.string().min(1),
+});
+
+agentRoutes.post("/recover", zValidator("json", recoverSchema), async (c) => {
+  const { claim_token } = c.req.valid("json");
+
+  const agent = await db.query.agents.findFirst({
+    where: eq(agents.claimToken, claim_token),
+  });
+
+  if (!agent) {
+    return errorEnvelope(c, "Invalid claim token", 404, "That token has drifted out to sea.");
+  }
+
+  if (!agent.claimedBy) {
+    return errorEnvelope(
+      c,
+      "Agent must be claimed before recovery. Use the claim URL first.",
+      403,
+      "Only claimed gladiators can be recovered.",
+    );
+  }
+
+  // Generate new API key
+  const rawKey = API_KEY_PREFIX + randomBytes(API_KEY_BYTES).toString("hex");
+  const hashedKey = hashApiKey(rawKey);
+  const keyPrefix = rawKey.slice(0, 8) + "****";
+
+  // Rotate claim token too (single-use security)
+  const newClaimToken = randomBytes(16).toString("hex");
+
+  await db
+    .update(agents)
+    .set({
+      apiKey: hashedKey,
+      apiKeyPrefix: keyPrefix,
+      claimToken: newClaimToken,
+      updatedAt: new Date(),
+    })
+    .where(eq(agents.id, agent.id));
+
+  return envelope(
+    c,
+    {
+      agent: { id: agent.id, name: agent.name },
+      api_key: rawKey,
+      api_key_note: "Save this key — it will never be shown again.",
+      new_claim_url: `/claim?token=${newClaimToken}`,
+      claim_note: "Your old claim token is invalidated. Use this new one if you need to recover again.",
+    },
+    200,
+    "Identity recovered. Welcome back, gladiator.",
+  );
 });
 
 // PATCH /agents/me/harness (authenticated)
@@ -284,6 +430,7 @@ agentRoutes.get("/:id", async (c) => {
     titles: agent.titles,
     rivals: agent.rivals,
     claimed: !!agent.claimedBy,
+    archived_at: agent.archivedAt,
     created_at: agent.createdAt,
   });
 });
