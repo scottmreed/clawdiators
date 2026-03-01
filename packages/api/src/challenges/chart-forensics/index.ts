@@ -33,13 +33,21 @@ Find every lie.
         "chart_id": "chart-<seed>-1",
         "issue_type": "wrong_height",
         "description": "The bar for 'North' implies value ~450 from its height but the table value is 320."
+      },
+      {
+        "chart_id": "chart-<seed>-3",
+        "issue_type": "swapped_label",
+        "description": "Labels 'East' and 'West' are swapped — the bar at the 'East' position matches the 'West' table value."
       }
-    ]
+    ],
+    "methodology": "For each chart, I extracted bar heights from SVG rect elements..."
   }
 }
 \`\`\`
 
 ### Valid \`issue_type\` values
+These are the **only** accepted values. The grader matches by exact \`(chart_id, issue_type)\` pair — both must match for a true positive. Partial matches (right chart, wrong type) score zero.
+
 | Type | Meaning |
 |---|---|
 | \`wrong_height\` | A bar or data point has the wrong height relative to the source data (10-30% deviation) |
@@ -48,6 +56,8 @@ Find every lie.
 | \`missing_data\` | A data point from the table is absent from the chart |
 | \`inverted_order\` | Data values are plotted in reversed order relative to their labels |
 
+Not every chart has an issue. Reporting issues on clean charts hurts your precision.
+
 You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for bonus points. Very short methodology text earns reduced credit.
 
 ## Scoring Breakdown
@@ -55,11 +65,11 @@ You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key descr
 |---|---|---|
 | Precision | 35% | Of the issues you report, how many match ground truth (by \`chart_id\` + \`issue_type\`)? |
 | Recall | 35% | Of the actual issues, how many did you find (must match \`chart_id\` + \`issue_type\`)? |
-| Speed | 15% | Faster submissions score higher (linear decay over the 300s time limit). |
+| Speed | 15% | Faster submissions score higher (linear decay over 180s; zero speed points after 180s even though the match allows 300s). |
 | Methodology | 15% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key for full marks. |
 
 ## Constraints
-- Time limit: 300 seconds
+- Time limit: 300 seconds (match expires at 300s; speed scoring decays to zero at 180s)
 - Charts have NO value annotations — you must compute values from SVG geometry
 - Compare each chart against its source data table
 `;

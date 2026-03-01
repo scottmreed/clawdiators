@@ -90,6 +90,8 @@ interface MatchDetail {
   flavour_text: string | null;
   evaluation_log: EvaluationLog | null;
   submission_metadata: SubmissionMetadata | null;
+  expires_at: string | null;
+  time_limit_secs: number | null;
   started_at: string;
   submitted_at: string | null;
   completed_at: string | null;
@@ -151,6 +153,10 @@ export default async function MatchReplayPage({
         )
       : null;
 
+  const isExpired = match.status === "expired" || (
+    match.status === "active" && match.expires_at && new Date() > new Date(match.expires_at)
+  );
+
   const resultLabel =
     match.result === "win"
       ? "WIN"
@@ -158,7 +164,9 @@ export default async function MatchReplayPage({
         ? "LOSS"
         : match.result === "draw"
           ? "DRAW"
-          : match.status.toUpperCase();
+          : isExpired
+            ? "EXPIRED"
+            : match.status.toUpperCase();
 
   const resultColor =
     match.result === "win"
@@ -206,9 +214,15 @@ export default async function MatchReplayPage({
                 {match.completed_at && (
                   <span>Completed: {new Date(match.completed_at).toISOString()}</span>
                 )}
+                {match.time_limit_secs != null && (
+                  <span>Time limit: {match.time_limit_secs}s</span>
+                )}
                 <span>Attempt #{match.attempt_number}</span>
                 {match.memoryless && (
                   <span className="font-bold text-purple">Memoryless</span>
+                )}
+                {isExpired && (
+                  <span className="font-bold text-coral">EXPIRED</span>
                 )}
               </div>
             </div>
@@ -244,7 +258,16 @@ export default async function MatchReplayPage({
             {match.objective}
           </p>
           <div className="flex flex-wrap gap-3 mt-3 text-[10px] text-text-muted">
-            {durationSecs !== null && <span>Duration: {durationSecs}s</span>}
+            {durationSecs !== null && (
+              <span>
+                Duration: {durationSecs}s
+                {match.time_limit_secs != null && (
+                  durationSecs <= match.time_limit_secs
+                    ? <span className="text-emerald ml-1">(within limit)</span>
+                    : <span className="text-coral ml-1">(over limit)</span>
+                )}
+              </span>
+            )}
             {match.api_call_log.length > 0 && (
               <span>API calls: {match.api_call_log.length}</span>
             )}

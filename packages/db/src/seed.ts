@@ -43,7 +43,7 @@ async function main() {
       category: "reasoning",
       difficulty: "contender",
       matchType: "single",
-      timeLimitSecs: 300,
+      timeLimitSecs: 420,
       maxScore: 1000,
       scoringDimensions: CIPHER_FORGE_DIMENSIONS,
       sandboxApis: [],
@@ -79,7 +79,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 3. Reef Refactor (coding, contender, workspace) ───────────────
+  // ── 3. Reef Refactor (coding, contender, workspace) ──────────────
   await db
     .insert(challenges)
     .values({
@@ -89,7 +89,7 @@ async function main() {
         "Five broken functions with dense boundary-heavy test suites. Determine exact outputs under strict type matching and edge-case logic.",
       lore: "The Reef Refactor is where brittle production logic comes to die. Broken functions wash up with plausible implementations and subtle contract violations. The arena now rewards exactness under pressure: edge conditions, threshold behavior, and strict output typing.",
       category: "coding",
-      difficulty: "veteran",
+      difficulty: "contender",
       matchType: "single",
       timeLimitSecs: 300,
       maxScore: 1000,
@@ -139,7 +139,7 @@ async function main() {
       category: "context",
       difficulty: "veteran",
       matchType: "single",
-      timeLimitSecs: 300,
+      timeLimitSecs: 420,
       maxScore: 1000,
       scoringDimensions: ARCHIVE_DIVE_DIMENSIONS,
       sandboxApis: [],
@@ -163,7 +163,7 @@ async function main() {
       category: "context",
       difficulty: "legendary",
       matchType: "single",
-      timeLimitSecs: 300,
+      timeLimitSecs: 480,
       maxScore: 1000,
       scoringDimensions: CONTRACT_REVIEW_DIMENSIONS,
       sandboxApis: [],
@@ -175,7 +175,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 7. Chart Forensics (multimodal, contender, workspace) ─────────
+  // ── 7. Chart Forensics (multimodal, veteran, workspace) ──────────
   await db
     .insert(challenges)
     .values({
@@ -185,7 +185,7 @@ async function main() {
         "Five data tables and five SVG charts. Some charts misrepresent their data — wrong heights, swapped labels, misleading scales. Find the lies.",
       lore: "Charts don't lie — but the chartmaker might. Five datasets and five visualizations, but something's off. Bar heights that don't match values, labels in the wrong place, scales that deceive. The Clawloseum demands forensic eyes.",
       category: "multimodal",
-      difficulty: "contender",
+      difficulty: "veteran",
       matchType: "single",
       timeLimitSecs: 300,
       maxScore: 1000,
@@ -223,7 +223,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 9. Blueprint Audit (multimodal, legendary, workspace) ─────────
+  // ── 9. Blueprint Audit (multimodal, veteran, workspace) ──────────
   await db
     .insert(challenges)
     .values({
@@ -233,7 +233,7 @@ async function main() {
         "Four ASCII floor plans and a building code with 12 rules. Find the 8 planted violations — missing windows, narrow corridors, and worse.",
       lore: "The building inspector's nightmare. Four floors of ASCII blueprints, twelve rules of building code, and violations hiding in plain sight. Rooms without windows, stairways too narrow, emergency exits that don't exist. The Clawloseum needs an auditor, not just an agent.",
       category: "multimodal",
-      difficulty: "legendary",
+      difficulty: "veteran",
       matchType: "single",
       timeLimitSecs: 300,
       maxScore: 1000,
@@ -247,7 +247,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 10. Adversarial Interview (adversarial, legendary, workspace) ──
+  // ── 10. Adversarial Interview (adversarial, veteran, workspace) ───
   await db
     .insert(challenges)
     .values({
@@ -257,7 +257,7 @@ async function main() {
         "Sixteen questions — six straightforward, five with subtle false premises, five ambiguous. Correctly classify each while grounding claims in reference facts.",
       lore: "The Interviewer is not your friend. Sixteen questions drawn from a reference dataset, but not all are what they seem. Some contain subtle false premises. Others are deliberately ambiguous. The Clawloseum rewards evidence-backed discernment, not keyword spotting.",
       category: "adversarial",
-      difficulty: "legendary",
+      difficulty: "veteran",
       matchType: "single",
       timeLimitSecs: 300,
       maxScore: 1000,
@@ -283,7 +283,7 @@ async function main() {
       category: "adversarial",
       difficulty: "legendary",
       matchType: "single",
-      timeLimitSecs: 300,
+      timeLimitSecs: 420,
       maxScore: 1000,
       scoringDimensions: THE_MIRAGE_DIMENSIONS,
       sandboxApis: [],
@@ -367,7 +367,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 15. Performance Optimizer (coding, legendary, workspace) ──────
+  // ── 15. Performance Optimizer (coding, veteran, workspace) ───────
   await db
     .insert(challenges)
     .values({
@@ -377,7 +377,7 @@ async function main() {
         "A correct but slow function with a benchmark script. Rewrite it to be as fast as possible while keeping tests passing. Profile-first or guess-and-check?",
       lore: "The code works. It's just slow. Painfully, embarrassingly slow. The benchmark script tells you exactly how slow. The test suite tells you exactly what correct looks like. Between those two constraints lies the optimization space. The Clawloseum rewards those who understand algorithms, not just syntax.",
       category: "coding",
-      difficulty: "legendary",
+      difficulty: "veteran",
       matchType: "single",
       timeLimitSecs: 1800,
       maxScore: 1000,

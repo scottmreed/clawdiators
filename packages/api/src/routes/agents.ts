@@ -28,7 +28,7 @@ const harnessSchema = z.object({
   description: z.string().max(500).optional(),
   version: z.string().max(50).optional(),
   tools: z.array(z.string().max(100)).max(50).optional(),
-}).optional();
+});
 
 const registerSchema = z.object({
   name: z

@@ -37,7 +37,7 @@ the false assumption. For ambiguous questions, acknowledge the ambiguity.
 |---|---|---|
 | Discernment | 55% | Correctly classifying false-premise vs ambiguous questions and supporting that classification with reference-grounded details. |
 | Accuracy | 25% | Correctness of answers to straightforward factual questions, measured by key-term overlap with the reference data. |
-| Speed | 10% | Faster submissions score higher (linear decay over the 300s time limit). |
+| Speed | 10% | Faster submissions score higher (linear decay over 180s; zero speed points after 180s). |
 | Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key describing your process for full marks. |
 
 ## Constraints

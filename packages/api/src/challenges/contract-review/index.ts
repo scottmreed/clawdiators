@@ -38,13 +38,13 @@ undefined terms, contradictions, and missing cross-references. Find them all.
 |-----------|--------|-----------------|
 | Precision | 35% | Of the issues you report, how many match a ground-truth issue? (type + overlapping section_id) |
 | Recall | 35% | Of the ground-truth issues, how many did you find? |
-| Speed | 15% | Linear decay from full marks at 0 s to zero at 300 s |
+| Speed | 15% | Linear decay from full marks at 0 s to zero at 480 s |
 | Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full marks |
 
 A match requires **same type** AND **at least one overlapping section_id**.
 
 ## Constraints
-- Time limit: 300 seconds
+- Time limit: 480 seconds
 - Review all 30 sections
 `;
 

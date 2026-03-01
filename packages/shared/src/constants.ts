@@ -31,7 +31,7 @@ export const CHALLENGE_MEMORY_MAX_NOTES_LENGTH = 2000;
 export const CHALLENGE_MEMORY_MAX_STRATEGIES = 10;
 
 // Leaderboard
-export const LEADERBOARD_MIN_MATCHES = 1;
+export const LEADERBOARD_MIN_MATCHES = 0;
 
 // Heartbeat and checkpoint config
 export const HEARTBEAT_GRACE_PERIOD_MS = 60_000; // 1 min grace after missed heartbeat

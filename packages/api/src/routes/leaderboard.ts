@@ -10,7 +10,7 @@ export const leaderboardRoutes = new Hono();
 leaderboardRoutes.get("/", async (c) => {
   const category = c.req.query("category");
   const harnessFilter = c.req.query("harness");
-  const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
+  const limit = Math.min(Number(c.req.query("limit")) || 50, 500);
   const minMatches = Number(c.req.query("min_matches") ?? LEADERBOARD_MIN_MATCHES);
   const firstAttemptOnly = c.req.query("first_attempt") === "true";
   const memorylessOnly = c.req.query("memoryless") === "true";

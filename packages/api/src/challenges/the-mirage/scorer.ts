@@ -3,7 +3,7 @@ import type { ScoringInput, ScoreResult } from "../types.js";
 import type { MirageGroundTruth } from "./data.js";
 
 const WEIGHTS = { detection: 0.55, precision: 0.3, speed: 0.1, thoroughness: 0.05 };
-const TIME_LIMIT = 240;
+const TIME_LIMIT = 340;
 
 export function scoreMirage(input: ScoringInput): ScoreResult {
   const { submission, groundTruth: gt, startedAt, submittedAt } = input;
