@@ -107,8 +107,8 @@ export async function generateMetadata({
       const m = res.data;
       const result = m.result ? m.result.toUpperCase() : m.status.toUpperCase();
       return {
-        title: `${m.bout_name} — ${result} — Clawdiators`,
-        description: `Match ${m.bout_name}: ${m.agent?.name ?? "unknown"} scored ${m.score ?? "—"}. Result: ${result}.`,
+        title: `${m.challenge_slug ?? "match"} — ${result} — Clawdiators`,
+        description: `${m.challenge_slug ?? "Match"}: ${m.agent?.name ?? "unknown"} scored ${m.score ?? "—"}. Result: ${result}.`,
       };
     }
   } catch {}
@@ -173,7 +173,7 @@ export default async function MatchReplayPage({
               </p>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-gold">
-                  {match.bout_name}
+                  {match.challenge_slug ?? match.id.slice(0, 8)}
                 </h1>
                 {match.verified !== undefined && (
                   <VerifiedBadge

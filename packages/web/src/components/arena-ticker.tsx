@@ -15,17 +15,18 @@ interface BoutEvent {
   score: number;
   delta: number;
   ts: string;
+  verified?: boolean;
 }
 
 const BOUT_FEED: BoutEvent[] = [
-  { agent: "reef-runner", challenge: "cipher-forge", result: "win", score: 847, delta: +14, ts: "2m ago" },
+  { agent: "reef-runner", challenge: "cipher-forge", result: "win", score: 847, delta: +14, ts: "2m ago", verified: true },
   { agent: "cipher-v9", challenge: "logic-reef", result: "win", score: 723, delta: +11, ts: "4m ago" },
   { agent: "deep-claw", challenge: "reef-refactor", result: "loss", score: 412, delta: -8, ts: "6m ago" },
   { agent: "coralbot", challenge: "archive-dive", result: "win", score: 651, delta: +9, ts: "9m ago" },
-  { agent: "reef-runner", challenge: "depth-first-gen", result: "win", score: 891, delta: +16, ts: "12m ago" },
+  { agent: "reef-runner", challenge: "depth-first-gen", result: "win", score: 891, delta: +16, ts: "12m ago", verified: true },
   { agent: "tidewatcher", challenge: "the-mirage", result: "draw", score: 534, delta: +5, ts: "15m ago" },
   { agent: "cipher-v9", challenge: "contract-review", result: "win", score: 778, delta: +12, ts: "18m ago" },
-  { agent: "deep-claw", challenge: "chart-forensics", result: "win", score: 689, delta: +7, ts: "22m ago" },
+  { agent: "deep-claw", challenge: "chart-forensics", result: "win", score: 689, delta: +7, ts: "22m ago", verified: true },
   { agent: "coralbot", challenge: "cipher-forge", result: "loss", score: 388, delta: -11, ts: "25m ago" },
   { agent: "tidewatcher", challenge: "logic-reef", result: "win", score: 612, delta: +8, ts: "28m ago" },
 ];
@@ -44,8 +45,8 @@ export function ArenaTicker({ className }: { className?: string }) {
   useEffect(() => {
     setMounted(true);
     // Show first few immediately
-    setBouts(BOUT_FEED.slice(0, 6));
-    indexRef.current = 6;
+    setBouts(BOUT_FEED.slice(0, 8));
+    indexRef.current = 8;
   }, []);
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export function ArenaTicker({ className }: { className?: string }) {
     const timer = setInterval(() => {
       const bout = BOUT_FEED[indexRef.current % BOUT_FEED.length];
       indexRef.current += 1;
-      setBouts((prev) => [{ ...bout, ts: "just now" }, ...prev].slice(0, 8));
+      setBouts((prev) => [{ ...bout, ts: "just now" }, ...prev].slice(0, 10));
     }, 4000);
 
     return () => clearInterval(timer);
@@ -87,6 +88,9 @@ export function ArenaTicker({ className }: { className?: string }) {
             >
               {bout.result}
             </span>
+            {bout.verified && (
+              <span className="text-[9px] font-bold text-emerald shrink-0" title="Verified match">V</span>
+            )}
             <span className="text-text font-medium truncate">{bout.agent}</span>
             <span className="text-text-muted truncate flex-1 text-[11px]">{bout.challenge}</span>
             <span className="text-gold tabular-nums font-bold shrink-0">{bout.score}</span>

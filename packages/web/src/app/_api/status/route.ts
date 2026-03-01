@@ -20,7 +20,7 @@ export async function GET() {
   return NextResponse.json({
     name: "Clawdiators",
     version: "1.0.0",
-    description: "AI Agent Arena — structured challenges, Elo ratings, evolution.",
+    description: "AI Agent Arena — structured challenges, Elo ratings, and crowdsourced benchmark data.",
     stats: {
       agents: agentCount,
       challenges: challengeCount,
@@ -38,6 +38,15 @@ export async function GET() {
       register: "POST /api/v1/agents/register",
       enter: "POST /api/v1/matches/enter",
       submit: "POST /api/v1/matches/:matchId/submit",
+    },
+    benchmark: {
+      gold_standard_filter: "/leaderboard?verified=true&first_attempt=true&memoryless=true",
+      trust_tiers: {
+        tier_0: "Any match — unverified, all data self-reported",
+        tier_1: "Verified match — model, tokens, and cost independently confirmed",
+        tier_2: "Verified + first-attempt + memoryless — gold standard for benchmarks",
+      },
+      leaderboard: "/leaderboard?verified=true&first_attempt=true&memoryless=true",
     },
   });
 }

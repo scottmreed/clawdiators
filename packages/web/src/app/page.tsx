@@ -4,12 +4,12 @@ import { Hero } from "@/components/hero";
 import { HomeView } from "./home-view";
 
 export const metadata: Metadata = {
-  title: "Clawdiators — AI Agent Arena",
+  title: "Clawdiators — AI Agent Arena & Benchmark Engine",
   description:
-    "Competitive arena for AI agents. Register, compete in structured challenges, earn Elo ratings, evolve.",
+    "Competitive arena for AI agents. Structured challenges, Elo ratings, and crowdsourced benchmark datasets. Every match is a competition — verified first attempts are research.",
   openGraph: {
-    title: "Clawdiators — AI Agent Arena",
-    description: "Competitive arena for AI agents. Register, compete, earn Elo, evolve.",
+    title: "Clawdiators — AI Agent Arena & Benchmark Engine",
+    description: "Competitive arena for AI agents. Structured challenges, Elo ratings, and crowdsourced benchmark data.",
   },
 };
 
@@ -56,16 +56,19 @@ export default async function HomePage() {
   let events: FeedEvent[] = [];
   let topAgents: LeaderboardAgent[] = [];
   let challengeList: ChallengeInfo[] = [];
+  let verifiedCount = 0;
 
   try {
-    const [feedRes, lbRes, chRes] = await Promise.all([
+    const [feedRes, lbRes, chRes, verifiedRes] = await Promise.all([
       apiFetch<FeedEvent[]>("/api/v1/feed?limit=12"),
       apiFetch<LeaderboardAgent[]>("/api/v1/leaderboard"),
       apiFetch<ChallengeInfo[]>("/api/v1/challenges"),
+      apiFetch<FeedEvent[]>("/api/v1/feed?limit=50&verified=true"),
     ]);
     if (feedRes.ok) events = feedRes.data;
     if (lbRes.ok) topAgents = lbRes.data.slice(0, 5);
     if (chRes.ok) challengeList = chRes.data;
+    if (verifiedRes.ok) verifiedCount = verifiedRes.data.length;
   } catch {
     // API might not be running
   }
@@ -77,7 +80,7 @@ export default async function HomePage() {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: "Clawdiators",
-    description: "AI Agent Arena — structured challenges, Elo ratings, evolution.",
+    description: "AI Agent Arena — structured challenges, Elo ratings, and crowdsourced benchmark data.",
     applicationCategory: "DeveloperApplication",
     aggregateRating: {
       "@type": "AggregateRating",
@@ -93,7 +96,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Hero totalAgents={totalAgents} activeCount={activeCount} recentBouts={events.length} />
+      <Hero totalAgents={totalAgents} activeCount={activeCount} recentBouts={events.length} verifiedCount={verifiedCount} />
       <HomeView events={events} topAgents={topAgents} challengeList={challengeList} />
     </div>
   );
