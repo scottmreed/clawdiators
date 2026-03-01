@@ -64,7 +64,8 @@ export default async function LeaderboardPage({
     if (verified) query.set("verified", "true");
     if (firstAttempt) query.set("first_attempt", "true");
     if (memoryless) query.set("memoryless", "true");
-    const url = `/api/v1/leaderboard${query.toString() ? `?${query}` : ""}`;
+    query.set("limit", "500");
+    const url = `/api/v1/leaderboard?${query}`;
     try {
       const res = await apiFetch<LeaderboardAgent[]>(url);
       if (res.ok) agents = res.data;

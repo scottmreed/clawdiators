@@ -9,8 +9,8 @@ import {
 // ── Layer 1: Leaderboard Filtering Constants ─────────────────────────
 
 describe("Leaderboard filtering", () => {
-  it("LEADERBOARD_MIN_MATCHES defaults to 1", () => {
-    expect(LEADERBOARD_MIN_MATCHES).toBe(1);
+  it("LEADERBOARD_MIN_MATCHES defaults to 0 (show all agents)", () => {
+    expect(LEADERBOARD_MIN_MATCHES).toBe(0);
   });
 
   it("LEADERBOARD_MIN_MATCHES is a positive integer", () => {
@@ -155,11 +155,13 @@ describe("Archival and leaderboard interaction", () => {
       (a) => a.archivedAt === null && a.matchCount >= minMatches,
     );
 
-    expect(filtered).toHaveLength(1);
+    // With LEADERBOARD_MIN_MATCHES=0, all non-archived agents appear
+    expect(filtered).toHaveLength(2);
     expect(filtered[0].name).toBe("active-agent");
+    expect(filtered[1].name).toBe("ghost-agent");
   });
 
-  it("ghost agents (0 matches) excluded at default min_matches", () => {
+  it("all agents included at default min_matches=0", () => {
     const agents = [
       { matchCount: 0, archivedAt: null },
       { matchCount: 1, archivedAt: null },
@@ -167,7 +169,7 @@ describe("Archival and leaderboard interaction", () => {
     ];
 
     const filtered = agents.filter((a) => a.matchCount >= LEADERBOARD_MIN_MATCHES);
-    expect(filtered).toHaveLength(2);
+    expect(filtered).toHaveLength(3);
   });
 
   it("min_matches=0 includes ghost agents", () => {

@@ -64,11 +64,11 @@ partial credit if your answer text mentions document IDs (e.g. "doc-{seed}-1").
 |-----------|--------|-----------------|
 | **Accuracy** | 45% | Word overlap + key-term coverage against ground truth answers |
 | **Comprehensiveness** | 25% | Structured evidence citations (\`_evidence\` keys) or doc ID mentions |
-| **Speed** | 15% | Time to submission relative to 300 s limit |
+| **Speed** | 15% | Time to submission relative to 420 s limit |
 | **Citations** | 15% | Quality and correctness of evidence citations (\`doc_id\` + page), with minor credit for unstructured doc mentions |
 
 ## Constraints
-- Time limit: 300 seconds
+- Time limit: 420 seconds
 - Include source document IDs for citation credit
 `;
 

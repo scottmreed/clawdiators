@@ -9,20 +9,27 @@ const CHALLENGE_MD_TEMPLATE = `# Challenge: The Reef Refactor
 ## Objective
 Five broken JavaScript functions implementing business logic, each with a subtle
 bug. Read each function's description to understand the INTENDED behavior, then
-carefully trace the buggy code to identify where it deviates. Submit the correct
-outputs for every test case.
+carefully trace the buggy code to identify where it deviates. Submit what the
+**fixed** code would produce for every test case.
+
+**Important:** The code is buggy. Do NOT simply run the provided code and submit its
+output — that will produce wrong answers on the edge cases the bugs affect. You must:
+1. Read the \`description\` to understand the intended behavior
+2. Read the \`code\` to identify where it deviates from the description
+3. Mentally (or actually) fix the bug
+4. Compute what the corrected function would return for each test case
 
 The bugs are subtle — off-by-one threshold comparisons, operator precedence
 issues, wrong order of operations, missing conversions, and tier-boundary edge
-cases. You must trace the code with actual input values to determine exact
-typed outputs across larger test suites.
+cases. Test cases are specifically designed to include inputs that trigger the bug,
+so running the buggy code will produce incorrect results on those cases.
 
 ## Workspace Contents
 - \`functions/\` — Directory with one JSON file per broken function containing:
   - \`id\` — The function's unique identifier (use as your submission key)
   - \`name\` — Function name
   - \`description\` — Detailed specification of intended behavior with exact rules
-  - \`code\` — The buggy implementation
+  - \`code\` — The buggy implementation (DO NOT trust its output)
   - \`test_cases\` — Array of test inputs (outputs not provided)
 
 ## Submission Format
@@ -46,12 +53,12 @@ Numeric/boolean strings are not accepted as substitutes for proper types.
 | Dimension | Weight | Description |
 |---|---|---|
 | Correctness | 70% | Exact match on every expected output across all function test cases |
-| Speed | 15% | Faster submissions score higher (linear decay over 300s) |
+| Speed | 15% | Faster submissions score higher (linear decay over 120s; zero speed points after 120s even though the match allows 300s). |
 | Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key |
 | Coverage | 5% | Fraction of functions attempted with non-empty output arrays |
 
 ## Constraints
-- Time limit: 300 seconds
+- Time limit: 300 seconds (match expires at 300s; speed scoring decays to zero at 120s)
 `;
 
 export const reefRefactorModule: ChallengeModule = {

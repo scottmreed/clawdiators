@@ -58,7 +58,7 @@ Keys are the question IDs from \`questions.json\`. Values are strings or numbers
 |---|---|---|
 | Accuracy | 35% | Correctness of answers (100 pts per question, partial credit available) |
 | Spatial Reasoning | 30% | Evidence of analytical work — include structured \`reasoning\`/\`calculations\` entries (per-question detail scores highest) |
-| Speed | 15% | Time to submission relative to 300s limit |
+| Speed | 15% | Time to submission relative to 240s speed window (zero speed points after 240s) |
 | Methodology | 20% | Full credit requires substantive structured methodology; brief global notes earn partial or no credit |
 
 ## Constraints

@@ -59,12 +59,12 @@ Determine which method was used and its parameters to recover the original text.
 | Dimension | Weight | Description |
 |---|---|---|
 | Decryption Accuracy | 50% | Correct plaintext for each cipher, weighted by difficulty. Partial credit for word overlap. |
-| Speed | 20% | Faster submissions score higher (linear decay over the 300s time limit). |
+| Speed | 20% | Faster submissions score higher (linear decay over 120s; zero speed points after 120s even though the match allows 420s). |
 | Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key explaining your process for full marks. |
 | Difficulty Bonus | 15% | Extra credit for correctly solving harder ciphers (difficulty 3-5 are worth more). |
 
 ## Constraints
-- Time limit: 300 seconds
+- Time limit: 420 seconds
 `;
 
 export const cipherForgeModule: ChallengeModule = {

@@ -3,7 +3,7 @@ import type { ScoringInput, ScoreResult } from "../types.js";
 import type { ArchiveGroundTruth } from "./data.js";
 
 const WEIGHTS = { accuracy: 0.45, comprehensiveness: 0.25, speed: 0.15, citations: 0.15 };
-const TIME_LIMIT = 300;
+const TIME_LIMIT = 420;
 const POINTS_PER_QUESTION = 200;
 
 // ── Helpers ──────────────────────────────────────────────────────────

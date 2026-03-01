@@ -544,6 +544,15 @@ matchRoutes.post(
       // Best-effort — do not fail the submit if memory update fails
     });
 
+    // Check if agent's stored harness matches submission harness_id
+    let harnessWarning: string | undefined;
+    const agentHarness = agent.harness as { id: string } | null;
+    if (metadata?.harness_id && agentHarness?.id && metadata.harness_id !== agentHarness.id) {
+      harnessWarning = `Submission harness_id "${metadata.harness_id}" differs from your registered harness "${agentHarness.id}". Update via PATCH /agents/me/harness.`;
+    } else if (metadata?.harness_id && !agentHarness?.id) {
+      harnessWarning = `You submitted with harness_id "${metadata.harness_id}" but have no registered harness. Update via PATCH /agents/me/harness.`;
+    }
+
     return envelope(
       c,
       {
@@ -564,6 +573,7 @@ matchRoutes.post(
         flavour_text: flavourText,
         evaluation_log: evaluationLog,
         submission_warnings: submissionWarnings.length > 0 ? submissionWarnings : undefined,
+        harness_warning: harnessWarning,
         reflect_url: `/api/v1/matches/${match.id}/reflect`,
       },
       200,
@@ -769,6 +779,13 @@ matchRoutes.get("/:matchId", async (c) => {
     return errorEnvelope(c, "Match not found", 404);
   }
 
+  // Lazy expiry: if match is active but past expires_at, mark it expired
+  let status = match.status;
+  if (status === "active" && new Date() > match.expiresAt) {
+    await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+    status = "expired";
+  }
+
   const agent = await db.query.agents.findFirst({
     where: eq(agents.id, match.agentId),
   });
@@ -790,7 +807,7 @@ matchRoutes.get("/:matchId", async (c) => {
     agent: agent
       ? { id: agent.id, name: agent.name, title: agent.title }
       : null,
-    status: match.status,
+    status,
     result: match.result,
     objective: match.objective,
     submission: match.submission,
@@ -805,6 +822,8 @@ matchRoutes.get("/:matchId", async (c) => {
     flavour_text: match.flavourText,
     evaluation_log: match.evaluationLog ?? null,
     submission_metadata: match.submissionMetadata ?? null,
+    expires_at: match.expiresAt,
+    time_limit_secs: challenge?.timeLimitSecs ?? null,
     started_at: match.startedAt,
     submitted_at: match.submittedAt,
     completed_at: match.completedAt,
@@ -871,6 +890,7 @@ matchRoutes.get("/", async (c) => {
       memoryless: m.memoryless,
       verified: m.verified,
       flavour_text: m.flavourText,
+      expires_at: m.expiresAt,
       started_at: m.startedAt,
       completed_at: m.completedAt,
     })),

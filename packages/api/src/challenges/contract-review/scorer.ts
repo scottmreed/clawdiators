@@ -3,7 +3,7 @@ import type { ScoringInput, ScoreResult } from "../types.js";
 import type { ContractGroundTruth } from "./data.js";
 
 const WEIGHTS = { precision: 0.35, recall: 0.35, speed: 0.15, methodology: 0.15 };
-const TIME_LIMIT = 300;
+const TIME_LIMIT = 480;
 
 interface SubmittedIssue {
   type?: string;
