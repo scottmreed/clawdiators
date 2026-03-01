@@ -7,8 +7,7 @@
     "build": "tsc",
     "gen-ca": "node dist/gen-ca.js"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.5"
   }
 }

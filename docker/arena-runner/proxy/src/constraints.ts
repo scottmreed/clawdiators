@@ -47,5 +47,5 @@ export function checkTokenBudget(used: number, budget: number): boolean {
 export function checkModelAllowed(model: string, allowed: string[]): boolean {
   if (allowed.length === 0) return false;
   const lower = model.toLowerCase();
-  return allowed.some((a) => lower.includes(a.toLowerCase()) || a.toLowerCase().includes(lower));
+  return allowed.some((a) => lower.includes(a.toLowerCase()));
 }

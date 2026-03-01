@@ -110,6 +110,57 @@ function parseGeneric(body: string): ParsedUsage {
   return { model: "unknown", input_tokens: 0, output_tokens: 0, extraction: "unknown" };
 }
 
+// ── Request body parsing ─────────────────────────────────────────────
+
+export interface ParsedRequest {
+  system_prompt: string | null;
+  tools: unknown[] | null;
+}
+
+function extractAnthropicRequest(body: string): ParsedRequest {
+  const json = JSON.parse(body);
+  let system_prompt: string | null = null;
+  if (typeof json.system === "string") {
+    system_prompt = json.system;
+  } else if (Array.isArray(json.system)) {
+    system_prompt = json.system.map((s: { text?: string }) => s.text ?? "").join("\n");
+  }
+  const tools = Array.isArray(json.tools) ? json.tools : null;
+  return { system_prompt, tools };
+}
+
+function extractOpenAIRequest(body: string): ParsedRequest {
+  const json = JSON.parse(body);
+  const systemMsgs = Array.isArray(json.messages)
+    ? json.messages.filter((m: { role: string }) => m.role === "system")
+    : [];
+  const system_prompt = systemMsgs.length > 0
+    ? systemMsgs.map((m: { content: string }) => m.content).join("\n")
+    : null;
+  const tools = Array.isArray(json.tools) ? json.tools : null;
+  return { system_prompt, tools };
+}
+
+function extractGoogleRequest(body: string): ParsedRequest {
+  const json = JSON.parse(body);
+  const system_prompt = json?.system_instruction?.parts?.[0]?.text ?? null;
+  const tools = Array.isArray(json.tools) ? json.tools : null;
+  return { system_prompt, tools };
+}
+
+export function parseRequestBody(provider: string, body: string): ParsedRequest {
+  try {
+    switch (provider) {
+      case "anthropic": return extractAnthropicRequest(body);
+      case "openai":    return extractOpenAIRequest(body);
+      case "google":    return extractGoogleRequest(body);
+      default:          return { system_prompt: null, tools: null };
+    }
+  } catch {
+    return { system_prompt: null, tools: null };
+  }
+}
+
 export function parseResponseBody(provider: string, body: string): ParsedUsage {
   try {
     switch (provider) {

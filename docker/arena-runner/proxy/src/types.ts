@@ -19,6 +19,19 @@ export interface ConstraintViolation {
   ts: string;
 }
 
+export interface HarnessSnapshot {
+  system_prompt_hash: string | null;
+  tool_definitions_hash: string | null;
+  tools_observed: string[];
+  models_used: string[];
+}
+
+export interface CostEstimate {
+  total_usd: number;
+  by_model: Record<string, number>;
+  pricing_version: string;
+}
+
 export interface VerifiedAttestation {
   image_digest: string;
   nonce: string;
@@ -30,5 +43,8 @@ export interface VerifiedAttestation {
   total_llm_calls: number;
   total_tool_calls: number;
   wall_clock_secs: number;
+  harness_snapshot: HarnessSnapshot;
+  estimated_cost: CostEstimate;
+  activity_summary: { unique_tools: string[]; files_read: 0; files_written: 0; commands_run: 0 };
   constraint_violations: ConstraintViolation[];
 }

@@ -167,6 +167,14 @@ export interface CostEstimate {
   pricing_version: string;
 }
 
+/** Proxy-observable harness fingerprint included in every attestation. */
+export interface AttestationHarnessSnapshot {
+  system_prompt_hash: string | null;
+  tool_definitions_hash: string | null;
+  tools_observed: string[];
+  models_used: string[];
+}
+
 export interface VerifiedAttestation {
   image_digest: string;
   nonce: string;
@@ -178,6 +186,7 @@ export interface VerifiedAttestation {
   total_llm_calls: number;
   total_tool_calls: number;
   wall_clock_secs: number;
+  harness_snapshot?: AttestationHarnessSnapshot;
   estimated_cost?: CostEstimate;
   activity_summary?: ActivitySummary;
   constraint_violations?: ConstraintViolation[];

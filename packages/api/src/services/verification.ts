@@ -10,14 +10,13 @@ export function computeChainHash(prevHash: string, seq: number, record: LLMCallR
   return createHash("sha256").update(data).digest("hex");
 }
 
-export function validateHashChain(nonce: string, calls: LLMCallRecord[]): { valid: boolean; error?: string } {
-  if (calls.length === 0) return { valid: true };
+export function validateHashChain(nonce: string, calls: LLMCallRecord[]): { valid: boolean; computedHead: string; error?: string } {
   let prevHash = nonce;
   for (let i = 0; i < calls.length; i++) {
-    if (calls[i].seq !== i + 1) return { valid: false, error: `seq mismatch at index ${i}` };
+    if (calls[i].seq !== i + 1) return { valid: false, computedHead: prevHash, error: `seq mismatch at index ${i}` };
     prevHash = computeChainHash(prevHash, calls[i].seq, calls[i]);
   }
-  return { valid: true };
+  return { valid: true, computedHead: prevHash };
 }
 
 export function checkTimingBounds(calls: LLMCallRecord[], matchStart: Date, matchExpiry: Date): boolean {
@@ -47,7 +46,9 @@ export function verifyAttestation(
   if (!nonceMatch) errors.push("Nonce mismatch");
 
   const chain = validateHashChain(nonce, attestation.llm_calls);
+  const chainHeadMatch = chain.computedHead === attestation.chain_head_hash;
   if (!chain.valid) errors.push(`Chain integrity: ${chain.error}`);
+  else if (!chainHeadMatch) errors.push("Chain head hash mismatch");
 
   const digestKnown = knownDigests.includes(attestation.image_digest);
   if (!digestKnown) errors.push(`Unknown image digest: ${attestation.image_digest}`);
@@ -62,7 +63,7 @@ export function verifyAttestation(
     status: errors.length === 0 ? "verified" : "failed",
     checks: {
       nonce_match: nonceMatch,
-      chain_integrity: chain.valid,
+      chain_integrity: chain.valid && chainHeadMatch,
       image_digest_known: digestKnown,
       timing_consistent: timingOk,
       token_count_consistent: tokensOk,

@@ -91,7 +91,7 @@ export class VerifiedRunner {
       "-p", `${this.port}:8080`,
       "-v", `${this.attestationDir}:/attestation`,
       "-e", `PROXY_NONCE=${nonce}`,
-      "-e", `IMAGE_DIGEST=${this.matchEntry.verification?.image ?? "sha256:unknown"}`,
+      "-e", `IMAGE_DIGEST=${this.matchEntry.verification?.image_digest ?? "sha256:unknown"}`,
       "-e", "ATTESTATION_DIR=/attestation",
       ...(constraintsJson ? ["-e", `PROXY_CONSTRAINTS=${constraintsJson}`] : []),
       this.image,
@@ -120,8 +120,24 @@ export class VerifiedRunner {
       console.warn("[VerifiedRunner] Warning: could not copy CA cert from container");
     }
 
-    // Give the proxy a moment to start listening
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Poll the health endpoint until the proxy is ready (max 10s)
+    await this.waitForProxy();
+  }
+
+  /** Poll GET /health until proxy responds 200 or 10s timeout. */
+  private async waitForProxy(timeoutMs = 10_000): Promise<void> {
+    const healthUrl = `http://localhost:${this.port}/health`;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(healthUrl, { signal: AbortSignal.timeout(500) });
+        if (res.ok) return;
+      } catch {
+        // Not yet up — retry
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    throw new Error(`[VerifiedRunner] Proxy did not become ready within ${timeoutMs}ms`);
   }
 
   /**

@@ -194,8 +194,8 @@ export function ChallengeDetailView({
                     </span>
                   ))}
                   {ch.constraints.networkAccess === false && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-coral/10 text-coral border border-coral/30">
-                      No network
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-coral/10 text-coral border border-coral/30" title="Non-LLM traffic (web search, external APIs) is blocked for verified submissions">
+                      LLM-only network
                     </span>
                   )}
                 </div>

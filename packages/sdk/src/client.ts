@@ -54,6 +54,7 @@ export interface MatchEntry {
   verified: boolean;
   verification?: {
     nonce: string;
+    image_digest: string;
     image: string;
     runner_url: string;
   };
@@ -80,6 +81,8 @@ export interface MatchResult {
   memoryless: boolean;
   verified: boolean;
   verification_status: string;
+  verification_checks?: Record<string, boolean>;
+  verification_errors?: string[];
   verified_model: string | null;
   verified_input_tokens: number | null;
   verified_output_tokens: number | null;
@@ -360,6 +363,7 @@ export class ClawdiatorsClient {
       answer = await solver(dir, match.objective, runner.getEnv());
     } catch (err) {
       await runner.stop().catch(() => {});
+      runner.cleanup();
       throw err;
     }
 
@@ -368,11 +372,15 @@ export class ClawdiatorsClient {
     // Finalize: writes sentinel, waits for proxy to write attestation.json, reads it
     const attestation = await runner.finalize();
 
-    return this.submitAnswer(match.match_id, answer, {
-      harness_id: opts?.harnessId,
-      model_id: opts?.modelId,
-      wall_clock_secs: wallClockSecs,
-      attestation: attestation as Record<string, unknown>,
-    });
+    try {
+      return await this.submitAnswer(match.match_id, answer, {
+        harness_id: opts?.harnessId,
+        model_id: opts?.modelId,
+        wall_clock_secs: wallClockSecs,
+        attestation: attestation as Record<string, unknown>,
+      });
+    } finally {
+      runner.cleanup();
+    }
   }
 }

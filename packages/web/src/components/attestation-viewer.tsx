@@ -19,6 +19,19 @@ interface ConstraintViolation {
   ts: string;
 }
 
+interface HarnessSnapshot {
+  system_prompt_hash: string | null;
+  tool_definitions_hash: string | null;
+  tools_observed: string[];
+  models_used: string[];
+}
+
+interface CostEstimate {
+  total_usd: number;
+  by_model: Record<string, number>;
+  pricing_version: string;
+}
+
 interface VerifiedAttestation {
   image_digest: string;
   nonce: string;
@@ -30,6 +43,8 @@ interface VerifiedAttestation {
   total_llm_calls: number;
   total_tool_calls: number;
   wall_clock_secs: number;
+  harness_snapshot?: HarnessSnapshot;
+  estimated_cost?: CostEstimate;
   constraint_violations?: ConstraintViolation[];
 }
 
@@ -146,6 +161,63 @@ export function AttestationViewer({ attestation, checks, raw }: AttestationViewe
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Harness snapshot */}
+      {attestation.harness_snapshot && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Harness Fingerprint</p>
+          <div className="grid grid-cols-1 gap-1 text-[10px]">
+            {attestation.harness_snapshot.system_prompt_hash && (
+              <div className="flex gap-2">
+                <span className="text-text-muted w-32 shrink-0">System prompt</span>
+                <code className="font-mono text-purple truncate" title={attestation.harness_snapshot.system_prompt_hash}>
+                  {attestation.harness_snapshot.system_prompt_hash.slice(0, 16)}…
+                </code>
+              </div>
+            )}
+            {attestation.harness_snapshot.tool_definitions_hash && (
+              <div className="flex gap-2">
+                <span className="text-text-muted w-32 shrink-0">Tool definitions</span>
+                <code className="font-mono text-purple truncate" title={attestation.harness_snapshot.tool_definitions_hash}>
+                  {attestation.harness_snapshot.tool_definitions_hash.slice(0, 16)}…
+                </code>
+              </div>
+            )}
+            {attestation.harness_snapshot.tools_observed.length > 0 && (
+              <div className="flex gap-2">
+                <span className="text-text-muted w-32 shrink-0">Tools observed</span>
+                <span className="text-text-secondary">{attestation.harness_snapshot.tools_observed.join(", ")}</span>
+              </div>
+            )}
+            {attestation.harness_snapshot.models_used.length > 0 && (
+              <div className="flex gap-2">
+                <span className="text-text-muted w-32 shrink-0">Models used</span>
+                <span className="text-text-secondary font-mono">{attestation.harness_snapshot.models_used.join(", ")}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Cost estimate */}
+      {attestation.estimated_cost && attestation.estimated_cost.total_usd > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            Estimated Cost
+            <span className="font-normal ml-1 text-text-muted">(v{attestation.estimated_cost.pricing_version})</span>
+          </p>
+          <div className="flex flex-wrap gap-3 text-[10px]">
+            <span>
+              Total: <span className="text-gold font-bold">${attestation.estimated_cost.total_usd.toFixed(4)}</span>
+            </span>
+            {Object.entries(attestation.estimated_cost.by_model).map(([model, cost]) => (
+              <span key={model} className="text-text-muted">
+                {model}: <span className="text-text-secondary">${cost.toFixed(4)}</span>
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

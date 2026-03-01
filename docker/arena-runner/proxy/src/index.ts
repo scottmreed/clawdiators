@@ -15,10 +15,11 @@ import * as path from "node:path";
 import * as crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { computeChainHash, hashBody } from "./chain.js";
-import { detectProvider, parseResponseBody } from "./providers.js";
-import { isStreamingResponse, accumulateSSE, extractStreamingUsage } from "./streaming.js";
+import { detectProvider, parseResponseBody, parseRequestBody } from "./providers.js";
+import { isStreamingResponse, accumulateSSE, extractStreamingUsage, extractStreamingToolNames, extractNonStreamingToolNames } from "./streaming.js";
 import { parseConstraints, checkCallLimit, checkTokenBudget, checkModelAllowed } from "./constraints.js";
-import type { LLMCallRecord, VerifiedAttestation, ConstraintViolation } from "./types.js";
+import { computeCost } from "./pricing.js";
+import type { LLMCallRecord, VerifiedAttestation, ConstraintViolation, HarnessSnapshot } from "./types.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
@@ -47,6 +48,16 @@ const state = {
   prevHash: NONCE,
   cumulativeTokens: 0,
   startedAt: new Date(),
+  // Harness fingerprinting — populated from the first intercepted request
+  harnessSnapshot: {
+    system_prompt_hash: null as string | null,
+    tool_definitions_hash: null as string | null,
+    tools_observed: [] as string[],
+    models_used: [] as string[],
+    firstRequestSeen: false,
+  },
+  // Activity counters
+  totalToolCalls: 0,
 };
 
 fs.mkdirSync(ATTESTATION_DIR, { recursive: true });
@@ -128,6 +139,11 @@ function recordCall(record: LLMCallRecord): void {
 function finalizeAttestation(): void {
   const wallClockSecs = Math.round((Date.now() - state.startedAt.getTime()) / 1000);
 
+  const { firstRequestSeen: _, ...harnessSnapshotData } = state.harnessSnapshot;
+  const harness_snapshot: HarnessSnapshot = harnessSnapshotData;
+
+  const estimated_cost = computeCost(state.calls);
+
   const attestation: VerifiedAttestation = {
     image_digest: IMAGE_DIGEST,
     nonce: state.nonce,
@@ -137,8 +153,16 @@ function finalizeAttestation(): void {
     total_input_tokens: state.calls.reduce((s, c) => s + c.input_tokens, 0),
     total_output_tokens: state.calls.reduce((s, c) => s + c.output_tokens, 0),
     total_llm_calls: state.calls.length,
-    total_tool_calls: 0,
+    total_tool_calls: state.totalToolCalls,
     wall_clock_secs: wallClockSecs,
+    harness_snapshot,
+    estimated_cost,
+    activity_summary: {
+      unique_tools: [...new Set(state.harnessSnapshot.tools_observed)],
+      files_read: 0,
+      files_written: 0,
+      commands_run: 0,
+    },
     constraint_violations: state.violations,
   };
 
@@ -244,6 +268,18 @@ function handleConnect(
       const requestHash = hashBody(requestBody);
       requestStartMs = Date.now();
 
+      // Harness fingerprinting — extract system prompt + tool definitions from first request
+      if (!state.harnessSnapshot.firstRequestSeen && requestBody) {
+        state.harnessSnapshot.firstRequestSeen = true;
+        const parsedReq = parseRequestBody(provider, requestBody);
+        if (parsedReq.system_prompt) {
+          state.harnessSnapshot.system_prompt_hash = hashBody(parsedReq.system_prompt);
+        }
+        if (parsedReq.tools) {
+          state.harnessSnapshot.tool_definitions_hash = hashBody(JSON.stringify(parsedReq.tools));
+        }
+      }
+
       // Forward to real upstream
       const upstreamReq = https.request(
         {
@@ -303,7 +339,22 @@ function handleConnect(
             };
 
             recordCall(record);
-            console.log(`[proxy] ${provider} call #${record.seq}: ${record.input_tokens}in/${record.output_tokens}out (${record.token_extraction})`);
+
+            // Track tools used and model names
+            const toolNames = streaming
+              ? extractStreamingToolNames(provider, responseBody)
+              : extractNonStreamingToolNames(provider, responseBody);
+            state.totalToolCalls += toolNames.length;
+            for (const name of toolNames) {
+              if (!state.harnessSnapshot.tools_observed.includes(name)) {
+                state.harnessSnapshot.tools_observed.push(name);
+              }
+            }
+            if (record.model !== "unknown" && !state.harnessSnapshot.models_used.includes(record.model)) {
+              state.harnessSnapshot.models_used.push(record.model);
+            }
+
+            console.log(`[proxy] ${provider} call #${record.seq}: ${record.input_tokens}in/${record.output_tokens}out (${record.token_extraction})${toolNames.length > 0 ? ` [${toolNames.length} tool call(s)]` : ""}`);
 
             // Post-call constraint checks (advisory — blocks next call)
             state.cumulativeTokens += record.input_tokens + record.output_tokens;
@@ -373,6 +424,13 @@ function parseHeaders(rawHeaders: string): Record<string, string> {
 // ── HTTP Proxy Server ──────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
+  // Health check endpoint — used by VerifiedRunner to confirm proxy is ready
+  if (req.method === "GET" && (req.url === "/health" || req.url === "/health/")) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true, calls: state.seq }));
+    return;
+  }
+
   // Plain HTTP request (rare for LLMs, but handle generically)
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const options: https.RequestOptions = {

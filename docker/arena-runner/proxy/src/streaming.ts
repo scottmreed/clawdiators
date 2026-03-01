@@ -87,6 +87,89 @@ function extractOpenAISSE(sseData: string): ParsedUsage {
   return { model, input_tokens: 0, output_tokens: 0, extraction: "unknown" };
 }
 
+// ── Tool use extraction ───────────────────────────────────────────────
+
+function extractAnthropicToolNames(sseData: string): string[] {
+  const names: string[] = [];
+  for (const line of sseData.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const dataStr = line.slice("data: ".length).trim();
+    if (dataStr === "[DONE]") continue;
+    try {
+      const data = JSON.parse(dataStr);
+      if (data.type === "content_block_start" && data.content_block?.type === "tool_use") {
+        names.push(data.content_block.name as string);
+      }
+    } catch { /* skip malformed */ }
+  }
+  return names;
+}
+
+function extractOpenAIToolNames(sseData: string): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const line of sseData.split("\n")) {
+    if (!line.startsWith("data: ")) continue;
+    const dataStr = line.slice("data: ".length).trim();
+    if (dataStr === "[DONE]") continue;
+    try {
+      const data = JSON.parse(dataStr);
+      const toolCalls = data.choices?.[0]?.delta?.tool_calls;
+      if (Array.isArray(toolCalls)) {
+        for (const tc of toolCalls) {
+          const name = tc.function?.name as string | undefined;
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            names.push(name);
+          }
+        }
+      }
+    } catch { /* skip malformed */ }
+  }
+  return names;
+}
+
+/**
+ * Extract tool names used from a streaming response body.
+ * Returns deduplicated list of tool names called in this response.
+ */
+export function extractStreamingToolNames(provider: string, sseData: string): string[] {
+  try {
+    switch (provider) {
+      case "anthropic": return extractAnthropicToolNames(sseData);
+      case "openai":    return extractOpenAIToolNames(sseData);
+      default:          return [];
+    }
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Extract tool names from a non-streaming response body.
+ */
+export function extractNonStreamingToolNames(provider: string, body: string): string[] {
+  try {
+    const json = JSON.parse(body);
+    switch (provider) {
+      case "anthropic": {
+        const content = json?.content as Array<{ type: string; name?: string }> | undefined;
+        if (!Array.isArray(content)) return [];
+        return content.filter((b) => b.type === "tool_use" && b.name).map((b) => b.name!);
+      }
+      case "openai": {
+        const toolCalls = json?.choices?.[0]?.message?.tool_calls as Array<{ function?: { name?: string } }> | undefined;
+        if (!Array.isArray(toolCalls)) return [];
+        return toolCalls.map((tc) => tc.function?.name ?? "").filter(Boolean);
+      }
+      default:
+        return [];
+    }
+  } catch {
+    return [];
+  }
+}
+
 export function extractStreamingUsage(provider: string, sseData: string): ParsedUsage {
   try {
     switch (provider) {

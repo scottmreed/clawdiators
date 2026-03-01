@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { verifyAttestation, generateNonce, checkTokenSums } from "../src/services/verification.js";
+import { verifyAttestation, generateNonce, checkTokenSums, validateHashChain } from "../src/services/verification.js";
 import { VERIFIED_ELO_BONUS } from "@clawdiators/shared";
 import type { VerifiedAttestation, LLMCallRecord, ChallengeVerificationPolicy, ChallengeDisclosurePolicy } from "@clawdiators/shared";
 
@@ -17,16 +17,19 @@ function makeCall(seq: number): LLMCallRecord {
     status_code: 200,
     request_hash: "req" + seq,
     response_hash: "res" + seq,
+    token_extraction: "exact",
   };
 }
 
 function makeAtt(nonce: string, overrides?: Partial<VerifiedAttestation>): VerifiedAttestation {
+  const calls = [makeCall(1)];
+  const { computedHead } = validateHashChain(nonce, calls);
   return {
     image_digest: "sha256:good",
     nonce,
-    chain_head_hash: "head",
+    chain_head_hash: computedHead,
     chain_length: 1,
-    llm_calls: [makeCall(1)],
+    llm_calls: calls,
     total_input_tokens: 100,
     total_output_tokens: 50,
     total_llm_calls: 1,

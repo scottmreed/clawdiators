@@ -131,6 +131,16 @@ matchRoutes.post(
     const expiresAt = new Date(now.getTime() + challenge.timeLimitSecs * 1000);
     const verificationNonce = verified ? generateNonce() : null;
 
+    // Look up the latest known-good arena-runner image digest for verified matches
+    let knownImageDigest: string | null = null;
+    if (verified) {
+      const latestImage = await db.query.verificationImages.findFirst({
+        where: isNull(verificationImages.deprecatedAt),
+        orderBy: desc(verificationImages.publishedAt),
+      });
+      knownImageDigest = latestImage?.digest ?? null;
+    }
+
     // Compute attempt number (count previous completed matches for this agent+challenge)
     const [{ count: previousCompleted }] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -196,7 +206,8 @@ matchRoutes.post(
         verified,
         verification: verified ? {
           nonce: verificationNonce,
-          image: "clawdiators/arena-runner:latest",
+          image_digest: knownImageDigest ?? "sha256:unknown",
+          image: "arena-runner:latest",
           runner_url: "ghcr.io/clawdiators/arena-runner:latest",
         } : undefined,
         constraints: challenge.constraints ? {
@@ -290,45 +301,13 @@ matchRoutes.post(
     // Generate ground truth from seed via module
     const data = mod.generateData(match.seed, submitConfig);
 
-    // Evaluate via dispatcher (deterministic, test-suite, or custom-script)
-    const scoringInput = {
-      submission: answer,
-      groundTruth: data.groundTruth,
-      startedAt: match.startedAt,
-      submittedAt: now,
-      apiCallCount: match.apiCallLog.length,
-      checkpoints: match.checkpoints,
-    };
-    // Validate submission structure and collect warnings for the agent
-    const submissionWarnings = mod.validateSubmission
-      ? mod.validateSubmission(answer, data.groundTruth)
-      : [];
-
-    const { result: evalResult, log: evaluationLog } = await evaluate(mod, scoringInput, {
-      verified: match.verified,
-      constraints: challenge.constraints as import("@clawdiators/shared").ChallengeConstraints | null,
-      attestation: metadata?.attestation as Record<string, unknown> | null ?? null,
-    });
-    const { breakdown } = evalResult;
-
-    // Determine result (solo calibration)
-    const result = scoreToResult(breakdown.total);
-
-    // IRT-Elo: use challenge difficulty as opponent rating
-    // See docs/scoring-methodology.md for rationale
-    const challengeDifficulty = (challenge.calibratedDifficulty ?? challenge.difficulty) as string;
-    const opponentElo = DIFFICULTY_ELO[challengeDifficulty] ?? ELO_DEFAULT;
-    const eloResult = calculateElo(
-      agent.elo,
-      opponentElo,
-      result,
-      agent.matchCount,
-    );
-
-    // Verification: run attestation checks if match was entered as verified
+    // Verification: run attestation checks BEFORE scoring so efficiency dimensions
+    // only apply to genuinely verified attestations.
     let verificationStatus: string = match.verified ? "failed" : "unverified";
     let verificationFields: Record<string, unknown> = {};
-    let eloChange = eloResult.change;
+    let verifiedAttestation: Record<string, unknown> | null = null;
+    let verificationChecks: Record<string, boolean> | null = null;
+    let verificationErrors: string[] | null = null;
 
     if (match.verified) {
       const attestationPayload = metadata?.attestation;
@@ -346,8 +325,12 @@ matchRoutes.post(
           knownDigests,
         );
         verificationStatus = vResult.status;
+        verificationChecks = vResult.checks;
+        verificationErrors = vResult.errors;
         const att = attestationPayload as Record<string, unknown>;
         const llmCalls = att.llm_calls as Array<{ model?: string }> | undefined;
+        // Extract harness snapshot fields if present
+        const harnessSnapshot = att.harness_snapshot as Record<string, unknown> | undefined;
         verificationFields = {
           attestation: attestationPayload,
           verifiedAt: new Date(),
@@ -355,13 +338,56 @@ matchRoutes.post(
           verifiedInputTokens: typeof att.total_input_tokens === "number" ? att.total_input_tokens : null,
           verifiedOutputTokens: typeof att.total_output_tokens === "number" ? att.total_output_tokens : null,
           verifiedLlmCalls: typeof att.total_llm_calls === "number" ? att.total_llm_calls : null,
+          systemPromptHash: typeof harnessSnapshot?.system_prompt_hash === "string" ? harnessSnapshot.system_prompt_hash : null,
+          toolDefinitionsHash: typeof harnessSnapshot?.tool_definitions_hash === "string" ? harnessSnapshot.tool_definitions_hash : null,
         };
-        // Apply 1.1x Elo bonus for verified wins
-        if (vResult.status === "verified" && eloResult.change > 0) {
-          eloChange = Math.round(eloResult.change * VERIFIED_ELO_BONUS);
+        // Only pass attestation to evaluator if it passed verification
+        if (vResult.status === "verified") {
+          verifiedAttestation = attestationPayload as Record<string, unknown>;
         }
       }
       // No attestation submitted → verification failed (already default)
+    }
+
+    // Evaluate via dispatcher (deterministic, test-suite, or custom-script)
+    const scoringInput = {
+      submission: answer,
+      groundTruth: data.groundTruth,
+      startedAt: match.startedAt,
+      submittedAt: now,
+      apiCallCount: match.apiCallLog.length,
+      checkpoints: match.checkpoints,
+    };
+    // Validate submission structure and collect warnings for the agent
+    const submissionWarnings = mod.validateSubmission
+      ? mod.validateSubmission(answer, data.groundTruth)
+      : [];
+
+    const { result: evalResult, log: evaluationLog } = await evaluate(mod, scoringInput, {
+      verified: verificationStatus === "verified",
+      constraints: challenge.constraints as import("@clawdiators/shared").ChallengeConstraints | null,
+      attestation: verifiedAttestation,
+    });
+    const { breakdown } = evalResult;
+
+    // Determine result (solo calibration)
+    const result = scoreToResult(breakdown.total);
+
+    // IRT-Elo: use challenge difficulty as opponent rating
+    // See docs/scoring-methodology.md for rationale
+    const challengeDifficulty = (challenge.calibratedDifficulty ?? challenge.difficulty) as string;
+    const opponentElo = DIFFICULTY_ELO[challengeDifficulty] ?? ELO_DEFAULT;
+    const eloResult = calculateElo(
+      agent.elo,
+      opponentElo,
+      result,
+      agent.matchCount,
+    );
+
+    // Apply 1.1x Elo bonus for verified wins
+    let eloChange = eloResult.change;
+    if (verificationStatus === "verified" && eloResult.change > 0) {
+      eloChange = Math.round(eloResult.change * VERIFIED_ELO_BONUS);
     }
 
     // Generate flavour text
@@ -557,6 +583,8 @@ matchRoutes.post(
         memoryless: match.memoryless,
         verified: match.verified,
         verification_status: verificationStatus,
+        verification_checks: verificationChecks ?? undefined,
+        verification_errors: verificationErrors?.length ? verificationErrors : undefined,
         verified_model: (verificationFields.verifiedModel as string | null) ?? null,
         verified_input_tokens: (verificationFields.verifiedInputTokens as number | null) ?? null,
         verified_output_tokens: (verificationFields.verifiedOutputTokens as number | null) ?? null,

@@ -29,6 +29,7 @@ function makeRecord(seq: number, overrides?: Partial<LLMCallRecord>): LLMCallRec
     status_code: 200,
     request_hash: "req" + seq,
     response_hash: "res" + seq,
+    token_extraction: "exact",
     ...overrides,
   };
 }
@@ -375,7 +376,7 @@ describe("VerifiedRunner.getEnv()", () => {
 // validates correctly with the server's validateHashChain.
 
 describe("chain ↔ server symmetry", () => {
-  it("a correctly built chain validates on the server", () => {
+  it("a correctly built chain validates on the server and head hash matches", () => {
     const nonce = "deadbeef".repeat(8); // 64 chars
     const calls: LLMCallRecord[] = [];
     let prevHash = nonce;
@@ -389,6 +390,29 @@ describe("chain ↔ server symmetry", () => {
     const result = validateHashChain(nonce, calls);
     expect(result.valid).toBe(true);
     expect(result.error).toBeUndefined();
+    // The computedHead must equal what the proxy would write as chain_head_hash
+    expect(result.computedHead).toBe(prevHash);
+  });
+
+  it("a chain with a tampered record field fails due to head hash mismatch", () => {
+    const nonce = "deadbeef".repeat(8);
+    const calls: LLMCallRecord[] = [];
+    let prevHash = nonce;
+
+    for (let i = 1; i <= 2; i++) {
+      const record = makeRecord(i);
+      prevHash = computeChainHash(prevHash, i, record);
+      calls.push(record);
+    }
+
+    // Record the correct head hash, then tamper with a field in call[0]
+    const correctHead = prevHash;
+    const tamperedCalls = [{ ...calls[0], input_tokens: 9999 }, calls[1]];
+
+    // validateHashChain still sees valid seqs, but computedHead will differ
+    const result = validateHashChain(nonce, tamperedCalls);
+    expect(result.valid).toBe(true); // seqs are still monotonic
+    expect(result.computedHead).not.toBe(correctHead); // but hash chain diverges
   });
 
   it("a chain with a tampered seq fails server validation", () => {

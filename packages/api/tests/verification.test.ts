@@ -24,16 +24,19 @@ function makeCall(seq: number, overrides?: Partial<LLMCallRecord>): LLMCallRecor
     status_code: 200,
     request_hash: "abc123",
     response_hash: "def456",
+    token_extraction: "exact",
     ...overrides,
   };
 }
 
-function makeAttestation(overrides?: Partial<VerifiedAttestation>): VerifiedAttestation {
+function makeAttestation(nonce: string, overrides?: Partial<VerifiedAttestation>): VerifiedAttestation {
   const calls = [makeCall(1), makeCall(2)];
+  // Compute the correct chain head hash so attestation is valid by default
+  const { computedHead } = validateHashChain(nonce, calls);
   return {
     image_digest: "sha256:known",
-    nonce: "testnonce",
-    chain_head_hash: "headhash",
+    nonce,
+    chain_head_hash: computedHead,
     chain_length: 2,
     llm_calls: calls,
     total_input_tokens: 200,
@@ -82,8 +85,10 @@ describe("computeChainHash", () => {
 // ── validateHashChain ────────────────────────────────────────────────
 
 describe("validateHashChain", () => {
-  it("returns valid for an empty chain", () => {
-    expect(validateHashChain("nonce", [])).toEqual({ valid: true });
+  it("returns valid for an empty chain with computedHead equal to nonce", () => {
+    const result = validateHashChain("nonce", []);
+    expect(result.valid).toBe(true);
+    expect(result.computedHead).toBe("nonce");
   });
 
   it("returns valid for a single-element chain with seq=1", () => {
@@ -131,17 +136,17 @@ describe("checkTimingBounds", () => {
 
 describe("checkTokenSums", () => {
   it("passes when input and output sums match", () => {
-    const att = makeAttestation(); // 2 calls: 100 in each = 200 total, 50 out each = 100 total
+    const att = makeAttestation("testnonce"); // 2 calls: 100 in each = 200 total, 50 out each = 100 total
     expect(checkTokenSums(att)).toBe(true);
   });
 
   it("fails when total_input_tokens does not match sum", () => {
-    const att = makeAttestation({ total_input_tokens: 999 });
+    const att = makeAttestation("testnonce", { total_input_tokens: 999 });
     expect(checkTokenSums(att)).toBe(false);
   });
 
   it("fails when total_output_tokens does not match sum", () => {
-    const att = makeAttestation({ total_output_tokens: 999 });
+    const att = makeAttestation("testnonce", { total_output_tokens: 999 });
     expect(checkTokenSums(att)).toBe(false);
   });
 });
@@ -155,17 +160,18 @@ describe("verifyAttestation", () => {
   const knownDigests = ["sha256:known"];
 
   it("returns verified when all checks pass", () => {
-    const att = makeAttestation({ nonce });
+    const att = makeAttestation(nonce);
     const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
     expect(result.status).toBe("verified");
     expect(result.errors).toHaveLength(0);
     expect(result.checks.nonce_match).toBe(true);
+    expect(result.checks.chain_integrity).toBe(true);
     expect(result.checks.image_digest_known).toBe(true);
     expect(result.checks.token_count_consistent).toBe(true);
   });
 
   it("returns failed when nonce mismatches", () => {
-    const att = makeAttestation({ nonce: "wrong-nonce" });
+    const att = makeAttestation("wrong-nonce");
     const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
     expect(result.status).toBe("failed");
     expect(result.checks.nonce_match).toBe(false);
@@ -173,7 +179,7 @@ describe("verifyAttestation", () => {
   });
 
   it("returns failed when image digest is unknown", () => {
-    const att = makeAttestation({ nonce, image_digest: "sha256:unknown" });
+    const att = makeAttestation(nonce, { image_digest: "sha256:unknown" });
     const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
     expect(result.status).toBe("failed");
     expect(result.checks.image_digest_known).toBe(false);
@@ -181,17 +187,27 @@ describe("verifyAttestation", () => {
 
   it("returns failed when timing is violated", () => {
     const pastCall = makeCall(1, { ts: "2000-01-01T00:00:00Z" });
-    const att = makeAttestation({ nonce, llm_calls: [pastCall], total_input_tokens: 100, total_output_tokens: 50 });
+    // Rebuild a valid attestation but with the past-dated call and recomputed chain head
+    const { computedHead } = validateHashChain(nonce, [pastCall]);
+    const att = makeAttestation(nonce, { llm_calls: [pastCall], chain_head_hash: computedHead, chain_length: 1, total_input_tokens: 100, total_output_tokens: 50 });
     const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
     expect(result.status).toBe("failed");
     expect(result.checks.timing_consistent).toBe(false);
   });
 
   it("returns failed when token sums mismatch", () => {
-    const att = makeAttestation({ nonce, total_input_tokens: 9999 });
+    const att = makeAttestation(nonce, { total_input_tokens: 9999 });
     const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
     expect(result.status).toBe("failed");
     expect(result.checks.token_count_consistent).toBe(false);
+  });
+
+  it("returns failed when chain_head_hash has been tampered with", () => {
+    const att = makeAttestation(nonce, { chain_head_hash: "tampered-hash" });
+    const result = verifyAttestation(att, nonce, start, expiry, knownDigests);
+    expect(result.status).toBe("failed");
+    expect(result.checks.chain_integrity).toBe(false);
+    expect(result.errors.some((e) => e.includes("head hash"))).toBe(true);
   });
 });
 
