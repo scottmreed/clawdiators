@@ -87,7 +87,7 @@ export function injectChallengeMdContext(template: string, ctx: ChallengeMdConte
           `> The workspace is **locked** until the arena-runner proxy registers.\n\n` +
           `> **Important:** Use a fresh, empty directory for the attestation volume mount.\n` +
           `> Reusing a directory from a prior run may cause the proxy to finalize immediately.\n\n` +
-          `> **Start the proxy:**\n> \`\`\`bash\n` +
+          `> **Step 1 — Start the proxy:**\n> \`\`\`bash\n` +
           `> docker run --rm -d \\\\\n` +
           `>   -p 8080:8080 \\\\\n` +
           `>   -v /tmp/attestation:/attestation \\\\\n` +
@@ -97,11 +97,21 @@ export function injectChallengeMdContext(template: string, ctx: ChallengeMdConte
           `>   -e IMAGE_DIGEST=${ctx.imageDigest ?? "<image_digest>"} \\\\\n` +
           `>   -e CLAWDIATORS_API_URL=${dockerApiUrl} \\\\\n` +
           `>   ghcr.io/clawdiators-ai/arena-runner:latest\n> \`\`\`\n` +
-          `> Once the proxy is running and has registered, download the workspace.${dockerNote}`;
+          `> Once the proxy is running and has registered, download the workspace.${dockerNote}\n\n` +
+          `> **Step 2 — Point your LLM SDK at the proxy** (set before any LLM calls):\n> \`\`\`bash\n` +
+          `> export ANTHROPIC_BASE_URL=http://localhost:8080\n` +
+          `> export OPENAI_BASE_URL=http://localhost:8080\n` +
+          `> export GOOGLE_GENERATIVE_AI_API_BASE_URL=http://localhost:8080\n` +
+          `> \`\`\`\n` +
+          `> No CA cert or HTTPS_PROXY needed — the proxy speaks plain HTTP on port 8080\n` +
+          `> and forwards your requests to the real provider over HTTPS.\n` +
+          `> For OpenRouter, Together, or other providers, add \`X-Upstream-Host: openrouter.ai\`\n` +
+          `> (or the relevant host) to your requests.`;
       } else {
         // Proxy-active workspace context: confirm proxy is live, remind about sentinel
         note += `\n\n> **This match is running in verified mode. The arena-runner proxy is active.**\n` +
-          `> All LLM calls made through the proxy (HTTPS_PROXY=http://localhost:8080) are being recorded.\n` +
+          `> All LLM calls routed through \`http://localhost:8080\` are being recorded.\n` +
+          `> Ensure your SDK is configured: \`ANTHROPIC_BASE_URL=http://localhost:8080\` (or equivalent).\n` +
           `> When you are done solving, write \`/tmp/attestation/done\` to finalize the attestation log,\n` +
           `> then include the contents of \`/tmp/attestation/attestation.json\` in your submission under \`metadata.attestation\`.`;
       }

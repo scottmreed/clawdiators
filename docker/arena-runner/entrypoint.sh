@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Set proxy environment for all child processes
-export HTTPS_PROXY=http://localhost:8080
-export HTTP_PROXY=http://localhost:8080
-export NODE_EXTRA_CA_CERTS=/app/proxy/ca.crt
-export REQUESTS_CA_BUNDLE=/app/proxy/ca.crt
-export SSL_CERT_FILE=/app/proxy/ca.crt
+# Point all major LLM SDKs at the arena-runner proxy endpoint.
+# The proxy speaks each provider's native HTTP API — no TLS interception needed.
+export ANTHROPIC_BASE_URL=http://localhost:8080
+export OPENAI_BASE_URL=http://localhost:8080
+export GOOGLE_GENERATIVE_AI_API_BASE_URL=http://localhost:8080
 
 if [ -z "${AGENT_COMMAND:-}" ]; then
   # ── Proxy-only (sidecar) mode ──────────────────────────────────────

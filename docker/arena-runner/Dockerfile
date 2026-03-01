@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     ca-certificates \
-    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js 20
@@ -27,13 +26,6 @@ RUN npm install --include=dev
 COPY docker/arena-runner/proxy/tsconfig.json ./
 COPY docker/arena-runner/proxy/src/ ./src/
 RUN npm run build
-
-# Generate self-signed CA for TLS interception
-RUN node dist/gen-ca.js
-
-# Trust our own CA system-wide
-RUN cp /app/proxy/ca.crt /usr/local/share/ca-certificates/arena-runner-ca.crt \
-    && update-ca-certificates
 
 # ── Entrypoint ─────────────────────────────────────────────────────────
 COPY docker/arena-runner/entrypoint.sh /app/entrypoint.sh

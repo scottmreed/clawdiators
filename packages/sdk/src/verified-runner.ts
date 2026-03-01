@@ -1,4 +1,4 @@
-import { execSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -39,7 +39,7 @@ export class VerifiedRunner {
 
   /**
    * Create and start a VerifiedRunner for the given match entry.
-   * Starts the proxy container and extracts the CA cert for the agent to trust.
+   * Starts the proxy container; no CA cert extraction needed.
    */
   static async create(matchEntry: MatchEntry, opts?: VerifiedRunnerOptions): Promise<VerifiedRunner> {
     const image = opts?.image ?? DEFAULT_IMAGE;
@@ -120,18 +120,6 @@ export class VerifiedRunner {
 
     console.log(`[VerifiedRunner] Container started: ${this.containerId.slice(0, 12)}`);
 
-    // Extract CA cert from container so the agent can trust it
-    const cpResult = spawnSync("docker", [
-      "cp",
-      `${this.containerId}:/app/proxy/ca.crt`,
-      join(this.attestationDir, "ca.crt"),
-    ], { stdio: "pipe" });
-
-    if (cpResult.status !== 0) {
-      // Non-fatal: agent may not need the CA cert if it's already trusted
-      console.warn("[VerifiedRunner] Warning: could not copy CA cert from container");
-    }
-
     // Poll the health endpoint until the proxy is ready (max 10s)
     await this.waitForProxy();
   }
@@ -153,17 +141,23 @@ export class VerifiedRunner {
   }
 
   /**
-   * Returns environment variables the agent should use so LLM calls go through
-   * the proxy. Pass these to child processes or set on process.env.
+   * Returns environment variables that point major LLM SDKs at the proxy endpoint.
+   * Pass these to child processes or merge into process.env before making LLM calls.
+   *
+   * Each SDK reads its own env var:
+   *   Anthropic SDK  → ANTHROPIC_BASE_URL
+   *   OpenAI SDK     → OPENAI_BASE_URL
+   *   Google AI SDK  → GOOGLE_GENERATIVE_AI_API_BASE_URL
+   *
+   * For other providers (OpenRouter, Together, etc.), set X-Upstream-Host on your
+   * requests: the proxy will forward to that host.
    */
   getEnv(): Record<string, string> {
-    const caPath = join(this.attestationDir, "ca.crt");
+    const proxyUrl = `http://localhost:${this.port}`;
     return {
-      HTTPS_PROXY: `http://localhost:${this.port}`,
-      HTTP_PROXY: `http://localhost:${this.port}`,
-      NODE_EXTRA_CA_CERTS: caPath,
-      REQUESTS_CA_BUNDLE: caPath,
-      SSL_CERT_FILE: caPath,
+      ANTHROPIC_BASE_URL: proxyUrl,
+      OPENAI_BASE_URL: proxyUrl,
+      GOOGLE_GENERATIVE_AI_API_BASE_URL: proxyUrl,
     };
   }
 

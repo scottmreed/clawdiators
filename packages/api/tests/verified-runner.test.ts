@@ -12,8 +12,6 @@
 import { describe, it, expect } from "vitest";
 import { computeChainHash, validateHashChain } from "../src/services/verification.js";
 import type { LLMCallRecord } from "@clawdiators/shared";
-import { join } from "node:path";
-import { createHash } from "node:crypto";
 
 // ── Shared helpers ────────────────────────────────────────────────────
 
@@ -342,31 +340,39 @@ describe("streaming.ts — unknown provider SSE returns unknown extraction", () 
 
 // ── VerifiedRunner.getEnv() ───────────────────────────────────────────
 //
-// Test the env var generation logic without Docker
+// Test the env var generation logic without Docker.
+// The proxy is now a plain HTTP endpoint — no CA cert, no HTTPS_PROXY.
 
-function makeProxyEnv(port: number, attestationDir: string): Record<string, string> {
-  const caPath = join(attestationDir, "ca.crt");
+function makeProxyEnv(port: number): Record<string, string> {
+  const proxyUrl = `http://localhost:${port}`;
   return {
-    HTTPS_PROXY: `http://localhost:${port}`,
-    HTTP_PROXY: `http://localhost:${port}`,
-    NODE_EXTRA_CA_CERTS: caPath,
-    REQUESTS_CA_BUNDLE: caPath,
-    SSL_CERT_FILE: caPath,
+    ANTHROPIC_BASE_URL: proxyUrl,
+    OPENAI_BASE_URL: proxyUrl,
+    GOOGLE_GENERATIVE_AI_API_BASE_URL: proxyUrl,
   };
 }
 
 describe("VerifiedRunner.getEnv()", () => {
-  it("returns correct proxy URL with configured port", () => {
-    const env = makeProxyEnv(8080, "/tmp/att");
-    expect(env.HTTPS_PROXY).toBe("http://localhost:8080");
-    expect(env.HTTP_PROXY).toBe("http://localhost:8080");
+  it("returns SDK base_url env vars pointing at the proxy port", () => {
+    const env = makeProxyEnv(8080);
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://localhost:8080");
+    expect(env.OPENAI_BASE_URL).toBe("http://localhost:8080");
+    expect(env.GOOGLE_GENERATIVE_AI_API_BASE_URL).toBe("http://localhost:8080");
   });
 
-  it("includes CA cert path derived from attestationDir", () => {
-    const env = makeProxyEnv(8080, "/tmp/test-att");
-    expect(env.NODE_EXTRA_CA_CERTS).toContain("ca.crt");
-    expect(env.NODE_EXTRA_CA_CERTS).toContain("/tmp/test-att");
-    expect(env.REQUESTS_CA_BUNDLE).toBe(env.NODE_EXTRA_CA_CERTS);
+  it("all base_url vars share the same proxy URL", () => {
+    const env = makeProxyEnv(9090);
+    expect(env.ANTHROPIC_BASE_URL).toBe(env.OPENAI_BASE_URL);
+    expect(env.OPENAI_BASE_URL).toBe(env.GOOGLE_GENERATIVE_AI_API_BASE_URL);
+  });
+
+  it("does not include HTTPS_PROXY or CA cert paths", () => {
+    const env = makeProxyEnv(8080);
+    expect(env).not.toHaveProperty("HTTPS_PROXY");
+    expect(env).not.toHaveProperty("HTTP_PROXY");
+    expect(env).not.toHaveProperty("NODE_EXTRA_CA_CERTS");
+    expect(env).not.toHaveProperty("REQUESTS_CA_BUNDLE");
+    expect(env).not.toHaveProperty("SSL_CERT_FILE");
   });
 });
 
