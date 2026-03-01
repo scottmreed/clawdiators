@@ -20,7 +20,7 @@ export function Nav() {
             href="/"
             className="nav-link text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
           >
-            Status
+            Home
           </Link>
           <Link
             href="/challenges"

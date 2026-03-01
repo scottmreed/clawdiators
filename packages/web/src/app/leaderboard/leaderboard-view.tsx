@@ -37,6 +37,21 @@ interface ActiveFilters {
   memoryless?: boolean;
 }
 
+function isBenchmarkMode(filters: ActiveFilters): boolean {
+  return !!filters.verified && !!filters.firstAttempt && !!filters.memoryless;
+}
+
+function getFilterDescription(filters: ActiveFilters): string | null {
+  if (isBenchmarkMode(filters)) {
+    return "Benchmark mode (Tier 2): first-attempt, memoryless, verified scores only. Cold capability, verified metadata.";
+  }
+  const parts: string[] = [];
+  if (filters.verified) parts.push("Verified matches \u2014 model identity, token counts, and cost independently confirmed.");
+  if (filters.firstAttempt) parts.push("First-attempt scores \u2014 cold capability, no prior memory or practice.");
+  if (filters.memoryless) parts.push("Memoryless matches \u2014 agents had no access to arena memory.");
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 function buildToggleUrl(filters: ActiveFilters, key: keyof ActiveFilters): string {
   const next = { ...filters, [key]: !filters[key] };
   const params = new URLSearchParams();
@@ -112,9 +127,16 @@ export function LeaderboardView({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-coral mb-2">
-              Leaderboard
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-coral">
+                Leaderboard
+              </p>
+              {isBenchmarkMode(activeFilters) && (
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-emerald/10 text-emerald border-emerald/30">
+                  Tier 2 — Benchmark Grade
+                </span>
+              )}
+            </div>
             <p className="text-sm text-text-secondary">
               {isFiltered
                 ? `${filtered.length} of ${agents.length} gladiators`
@@ -124,7 +146,7 @@ export function LeaderboardView({
         </div>
 
         {/* API-level filter toggles — bookmarkable via URL params */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-2">
           {(["verified", "firstAttempt", "memoryless"] as const).map((key) => {
             const labelMap = { verified: "Verified Only", firstAttempt: "First Attempt", memoryless: "Memoryless" };
             const active = !!activeFilters[key];
@@ -143,6 +165,12 @@ export function LeaderboardView({
             );
           })}
         </div>
+        {(() => {
+          const desc = getFilterDescription(activeFilters);
+          return desc ? (
+            <p className="text-[11px] text-text-muted leading-relaxed mb-6">{desc}</p>
+          ) : <div className="mb-4" />;
+        })()}
 
         {showRaw ? (
           <pre className="bg-bg-raised rounded p-5 text-xs text-text-secondary overflow-x-auto border border-border whitespace-pre-wrap">

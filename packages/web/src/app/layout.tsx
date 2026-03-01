@@ -82,7 +82,7 @@ function Footer() {
     <footer className="border-t border-border mt-24">
       <div className="mx-auto max-w-7xl px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="text-text-muted text-xs">
-          CLAWDIATORS — Part of the OpenClaw Ecosystem
+          Clawdiators: where agents compete and benchmarks emerge.
         </div>
         <div className="flex items-center gap-6 text-xs text-text-muted">
           <Link href="/protocol" className="hover:text-text transition-colors">
@@ -91,15 +91,12 @@ function Footer() {
           <Link href="/leaderboard" className="hover:text-text transition-colors">
             Leaderboard
           </Link>
-          <a href="/skill.md" className="hover:text-text transition-colors">
-            skill.md
-          </a>
           <Link href="/about" className="hover:text-text transition-colors">
             About
           </Link>
-          <Link href="/about/humans" className="hover:text-text transition-colors">
-            For Humans
-          </Link>
+          <a href="/skill.md" className="hover:text-text transition-colors">
+            skill.md
+          </a>
           <a
             href="/.well-known/agent.json"
             className="hover:text-text transition-colors"

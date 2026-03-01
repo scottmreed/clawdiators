@@ -42,6 +42,31 @@ interface ChallengeInfo {
   match_type: string;
 }
 
+/** Pick up to `n` challenges, round-robin across difficulty tiers. */
+function pickMixed(list: ChallengeInfo[], n: number): ChallengeInfo[] {
+  const buckets: Record<string, ChallengeInfo[]> = {};
+  for (const ch of list) {
+    (buckets[ch.difficulty] ??= []).push(ch);
+  }
+  const tiers = ["contender", "veteran", "legendary"];
+  const result: ChallengeInfo[] = [];
+  let round = 0;
+  while (result.length < n) {
+    let added = false;
+    for (const tier of tiers) {
+      if (result.length >= n) break;
+      const bucket = buckets[tier];
+      if (bucket && round < bucket.length) {
+        result.push(bucket[round]);
+        added = true;
+      }
+    }
+    if (!added) break;
+    round++;
+  }
+  return result;
+}
+
 export function HomeView({
   events,
   topAgents,
@@ -71,12 +96,20 @@ export function HomeView({
           <h2 className="text-xs font-bold uppercase tracking-wider text-coral">
             Leaderboard
           </h2>
-          <Link
-            href="/leaderboard"
-            className="text-xs text-text-muted hover:text-text transition-colors"
-          >
-            full board &rarr;
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/leaderboard"
+              className="text-xs text-text-muted hover:text-text transition-colors"
+            >
+              full board &rarr;
+            </Link>
+            <Link
+              href="/leaderboard?verified=true&first_attempt=true&memoryless=true"
+              className="text-xs text-emerald hover:text-emerald-bright transition-colors"
+            >
+              benchmark &rarr;
+            </Link>
+          </div>
         </div>
         {topAgents.length === 0 ? (
           <div className="card p-6">
@@ -148,51 +181,42 @@ export function HomeView({
             href="/challenges"
             className="text-xs text-text-muted hover:text-text transition-colors"
           >
-            details &rarr;
+            all challenges &rarr;
           </Link>
         </div>
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider">
-                <th className="py-2 px-4 text-left font-bold">Slug</th>
-                <th className="py-2 px-4 text-left font-bold">Category</th>
-                <th className="py-2 px-4 text-left font-bold">Difficulty</th>
-                <th className="py-2 px-4 text-right font-bold">Time Limit</th>
-                <th className="py-2 px-4 text-right font-bold">Max Score</th>
-                <th className="py-2 px-4 text-right font-bold">Active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {challengeList.map((ch) => (
-                <tr
-                  key={ch.slug}
-                  className="border-b border-border/50 hover:bg-bg-elevated/50 transition-colors"
-                >
-                  <td className="py-2 px-4 font-bold">
-                    <Link href={`/challenges/${ch.slug}`} className="hover:text-coral transition-colors">
-                      {ch.slug}
-                    </Link>
-                  </td>
-                  <td className="py-2 px-4 text-text-secondary">{ch.category}</td>
-                  <td className="py-2 px-4">
-                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded badge-${ch.difficulty}`}>
-                      {ch.difficulty}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 text-right text-text-secondary">{ch.time_limit_secs}s</td>
-                  <td className="py-2 px-4 text-right text-gold">{ch.max_score}</td>
-                  <td className="py-2 px-4 text-right">
-                    {ch.active ? (
-                      <span className="text-emerald font-bold">yes</span>
-                    ) : (
-                      <span className="text-text-muted">no</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {[...new Set(challengeList.map((ch) => ch.category))].sort().map((cat) => (
+            <span
+              key={cat}
+              className="text-[10px] font-bold px-2 py-0.5 rounded bg-bg-elevated text-text-muted border border-border/50"
+            >
+              {cat}
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {pickMixed(challengeList, 6).map((ch) => (
+            <Link
+              key={ch.slug}
+              href={`/challenges/${ch.slug}`}
+              className="card px-4 py-3 hover:border-text-muted transition-colors group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-sm group-hover:text-coral transition-colors">
+                  {ch.slug}
+                </span>
+                <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded badge-${ch.difficulty}`}>
+                  {ch.difficulty}
+                </span>
+              </div>
+              <p className="text-xs text-text-muted line-clamp-2 mb-2">{ch.description}</p>
+              <div className="flex items-center gap-3 text-[10px] text-text-muted">
+                <span>{ch.category}</span>
+                <span>{ch.time_limit_secs}s</span>
+                <span className="text-gold font-bold">{ch.max_score} pts</span>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
     </div>

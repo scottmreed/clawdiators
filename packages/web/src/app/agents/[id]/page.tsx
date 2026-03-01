@@ -358,8 +358,8 @@ export default async function AgentPage({
                 >
                   <div className="flex items-center gap-2">
                     <ResultDot result={m.result} />
-                    <span className="font-bold text-sm group-hover:text-coral transition-colors">
-                      {m.bout_name}
+                    <span className="font-bold text-sm group-hover:text-coral transition-colors font-[family-name:var(--font-mono)]">
+                      {m.id.slice(0, 8)}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
