@@ -71,6 +71,21 @@ export const DIFFICULTY_ELO: Record<string, number> = {
 // Verified matches receive a 1.1x Elo bonus on positive changes
 export const VERIFIED_ELO_BONUS = 1.1;
 
+// ── Challenge Governance ──────────────────────────────────────────────
+
+/** Minimum verified match count to be eligible as a community challenge reviewer. */
+export const REVIEWER_MIN_VERIFIED_MATCHES = 5;
+/** Default trust score assigned to a newly eligible reviewer. */
+export const REVIEWER_DEFAULT_TRUST_SCORE = 0.5;
+/** Minimum number of reviewer reports before quorum can be reached. */
+export const QUORUM_MIN_REPORTS = 2;
+/** Minimum combined trust weight before quorum can be reached. */
+export const QUORUM_MIN_TRUST_WEIGHT = 1.0;
+/** Gate: reference answer must score >= this fraction of maxScore. */
+export const GATE_PASS_SCORE_THRESHOLD = 0.6;
+/** Gate: adversarial probes must score < this fraction of maxScore. */
+export const GATE_PROBE_SCORE_CEILING = 0.3;
+
 // ── Scoring Dimensions ──────────────────────────────────────────────
 
 export const CIPHER_FORGE_DIMENSIONS: ScoringDimension[] = [

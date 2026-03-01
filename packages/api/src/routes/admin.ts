@@ -3,9 +3,7 @@ import { eq, and, isNull, desc } from "drizzle-orm";
 import { db, challengeDrafts, challenges, agents, verificationImages, modelPricing } from "@clawdiators/db";
 import { adminAuthMiddleware } from "../middleware/admin-auth.js";
 import { envelope, errorEnvelope } from "../middleware/envelope.js";
-import { validateSpec, verifyDeterminism } from "../challenges/primitives/validator.js";
-import { createDeclarativeModule } from "../challenges/primitives/declarative-module.js";
-import { registerModule } from "../challenges/registry.js";
+import { approveDraft } from "../challenges/challenge-service.js";
 
 export const adminRoutes = new Hono();
 
@@ -33,6 +31,10 @@ adminRoutes.get("/drafts", async (c) => {
       slug: (d.spec as Record<string, unknown>).slug,
       name: (d.spec as Record<string, unknown>).name,
       status: d.status,
+      gate_status: d.gateStatus,
+      quorum_status: d.reviewerVerdicts?.length
+        ? `${d.reviewerVerdicts.length} verdicts`
+        : "no verdicts",
       rejection_reason: d.rejectionReason,
       created_at: d.createdAt.toISOString(),
       reviewed_at: d.reviewedAt?.toISOString() ?? null,
@@ -40,7 +42,7 @@ adminRoutes.get("/drafts", async (c) => {
   );
 });
 
-// POST /admin/drafts/:id/approve — validate, insert challenge, register module
+// POST /admin/drafts/:id/approve — approve a draft (requires gates to have passed)
 adminRoutes.post("/drafts/:id/approve", async (c) => {
   const id = c.req.param("id");
 
@@ -56,104 +58,51 @@ adminRoutes.post("/drafts/:id/approve", async (c) => {
     return errorEnvelope(c, "Draft already approved", 400, "This blueprint is already in the arena.");
   }
 
-  // Validate the spec
-  const validation = validateSpec(draft.spec);
-  if (!validation.valid) {
+  // Gate status checks
+  if (draft.gateStatus === "pending_gates") {
+    return errorEnvelope(c, "Gates still running — check back shortly", 400, "The arena's quality gates are still running.");
+  }
+  if (draft.gateStatus === "failed") {
     return errorEnvelope(
       c,
-      `Spec validation failed: ${validation.errors.join("; ")}`,
+      "Gates failed — cannot approve a draft with gate failures",
       400,
-      "The blueprint crumbles under scrutiny.",
+      "The blueprint failed the quality gates.",
     );
   }
 
-  const spec = validation.spec;
+  try {
+    const result = await approveDraft(id);
+    return envelope(c, result, 200, "A new trial enters the arena!");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return errorEnvelope(c, msg, 400, "The blueprint crumbles under scrutiny.");
+  }
+});
 
-  // Create declarative module and verify determinism
-  const mod = createDeclarativeModule(spec);
-  const deterCheck = verifyDeterminism(
-    (seed) => mod.generateData(seed, {}),
-  );
-  if (!deterCheck.deterministic) {
-    return errorEnvelope(
-      c,
-      `Determinism check failed: ${deterCheck.error}`,
-      400,
-      "The tides must flow the same way twice.",
-    );
+// POST /admin/drafts/:id/escalate — manually escalate a draft for human review
+adminRoutes.post("/drafts/:id/escalate", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const reason = (body as { reason?: string }).reason ?? "Escalated by admin.";
+
+  const draft = await db.query.challengeDrafts.findFirst({
+    where: eq(challengeDrafts.id, id),
+  });
+
+  if (!draft) {
+    return errorEnvelope(c, "Draft not found", 404);
+  }
+  if (draft.status === "approved") {
+    return errorEnvelope(c, "Cannot escalate an approved draft", 400);
   }
 
-  // Check if this is a version update
-  const updatesSlug = (draft.spec as Record<string, unknown>).updates_slug as string | undefined;
-  let newVersion = 1;
-  let previousVersionId: string | undefined;
-
-  if (updatesSlug) {
-    // Find the current active version to archive
-    const currentVersion = await db.query.challenges.findFirst({
-      where: and(eq(challenges.slug, updatesSlug), isNull(challenges.archivedAt)),
-    });
-    if (currentVersion) {
-      // Archive the old version
-      await db
-        .update(challenges)
-        .set({ archivedAt: new Date() })
-        .where(eq(challenges.id, currentVersion.id));
-      newVersion = currentVersion.version + 1;
-      previousVersionId = currentVersion.id;
-    }
-  }
-
-  // Insert into challenges table
-  await db
-    .insert(challenges)
-    .values({
-      slug: spec.slug,
-      name: spec.name,
-      description: spec.description,
-      lore: spec.lore,
-      category: spec.category,
-      difficulty: spec.difficulty,
-      matchType: spec.matchType,
-      timeLimitSecs: spec.timeLimitSecs,
-      maxScore: spec.scoring.maxScore,
-      scoringDimensions: spec.scoring.dimensions,
-      sandboxApis: [],
-      config: { communitySpec: draft.spec },
-      phases: spec.phases ?? [],
-      active: true,
-      authorAgentId: draft.authorAgentId,
-      workspaceType: spec.workspace.type,
-      submissionType: spec.submission.type,
-      scoringMethod: spec.scoring.method,
-      challengeMdTemplate: spec.workspace.challengeMd,
-      version: newVersion,
-      previousVersionId: previousVersionId ?? null,
-      changelog: updatesSlug ? `Updated from v${newVersion - 1}` : null,
-      constraints: spec.constraints ?? null,
-      verificationPolicy: spec.verification ?? null,
-      disclosurePolicy: spec.disclosure ?? null,
-    })
-    .onConflictDoNothing();
-
-  // Register the module at runtime
-  registerModule(mod);
-
-  // Update draft status
   await db
     .update(challengeDrafts)
-    .set({
-      status: "approved",
-      reviewedAt: new Date(),
-    })
+    .set({ status: "escalated", rejectionReason: reason, reviewedAt: new Date() })
     .where(eq(challengeDrafts.id, id));
 
-  return envelope(
-    c,
-    { id, slug: spec.slug, status: "approved" },
-    200,
-    "A new trial enters the arena!",
-  );
+  return envelope(c, { id, status: "escalated", reason }, 200, "Draft escalated for human review.");
 });
 
 // POST /admin/drafts/:id/reject — set rejection_reason + reviewed_at

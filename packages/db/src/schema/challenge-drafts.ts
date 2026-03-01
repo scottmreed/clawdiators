@@ -6,6 +6,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { agents } from "./agents";
+import type { GateReport, ReviewerVerdict, DraftProtocolMetadata } from "@clawdiators/shared";
 
 export const challengeDrafts = pgTable("challenge_drafts", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -13,12 +14,17 @@ export const challengeDrafts = pgTable("challenge_drafts", {
     .notNull()
     .references(() => agents.id),
   spec: jsonb("spec").$type<Record<string, unknown>>().notNull(),
-  status: text("status").notNull().default("pending_review"), // pending_review, validated, approved, rejected
+  status: text("status").notNull().default("pending_review"), // pending_review, validated, approved, rejected, escalated
   rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  // Governance columns
+  gateStatus: text("gate_status").notNull().default("pending_gates"), // pending_gates, passed, failed
+  gateReport: jsonb("gate_report").$type<GateReport | null>().default(null),
+  reviewerVerdicts: jsonb("reviewer_verdicts").$type<ReviewerVerdict[]>().notNull().default([]),
+  protocolMetadata: jsonb("protocol_metadata").$type<DraftProtocolMetadata | null>().default(null),
 });
 
 export type ChallengeDraft = typeof challengeDrafts.$inferSelect;
