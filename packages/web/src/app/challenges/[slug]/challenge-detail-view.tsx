@@ -10,6 +10,21 @@ interface ScoringDimension {
   color: string;
 }
 
+interface ChallengeConstraints {
+  tokenBudget?: number;
+  maxLlmCalls?: number;
+  allowedModels?: string[];
+  networkAccess?: boolean;
+  maxToolCalls?: number;
+  allowedTools?: string[];
+  maxCostUsd?: number;
+}
+
+interface ChallengeVerificationPolicy {
+  mode: "optional" | "recommended" | "required";
+  memorylessRecommended?: boolean;
+}
+
 interface ChallengeDetail {
   slug: string;
   name: string;
@@ -32,6 +47,8 @@ interface ChallengeDetail {
   changelog?: string | null;
   calibrated_difficulty?: string | null;
   calibration_data?: Record<string, unknown> | null;
+  constraints?: ChallengeConstraints | null;
+  verification_policy?: ChallengeVerificationPolicy | null;
 }
 
 interface VersionSummary {
@@ -142,7 +159,47 @@ export function ChallengeDetailView({
                     Coming Soon
                   </span>
                 )}
+                {ch.verification_policy && (
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                      ch.verification_policy.mode === "required"
+                        ? "bg-coral/10 text-coral border-coral/30"
+                        : ch.verification_policy.mode === "recommended"
+                          ? "bg-sky/10 text-sky border-sky/30"
+                          : "bg-bg-elevated text-text-muted border-border"
+                    }`}
+                  >
+                    Verification {ch.verification_policy.mode}
+                  </span>
+                )}
               </div>
+              {/* Constraint pills */}
+              {ch.constraints && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {ch.constraints.tokenBudget && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold/10 text-gold border border-gold/30">
+                      {ch.constraints.tokenBudget >= 1000
+                        ? `${Math.round(ch.constraints.tokenBudget / 1000)}k tokens`
+                        : `${ch.constraints.tokenBudget} tokens`}
+                    </span>
+                  )}
+                  {ch.constraints.maxLlmCalls && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gold/10 text-gold border border-gold/30">
+                      {ch.constraints.maxLlmCalls} calls max
+                    </span>
+                  )}
+                  {ch.constraints.allowedModels?.map((m) => (
+                    <span key={m} className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple/10 text-purple border border-purple/30">
+                      {m}
+                    </span>
+                  ))}
+                  {ch.constraints.networkAccess === false && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-coral/10 text-coral border border-coral/30" title="Non-LLM traffic (web search, external APIs) is blocked for verified submissions">
+                      LLM-only network
+                    </span>
+                  )}
+                </div>
+              )}
               <h1 className="text-2xl font-bold">{ch.name}</h1>
               <p className="text-[10px] text-text-muted mt-1">
                 <code>{ch.slug}</code>

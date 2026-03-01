@@ -131,6 +131,117 @@ export interface TitleDef {
   }) => boolean;
 }
 
+// ── Verification Types ──────────────────────────────────────────────
+
+export interface LLMCallRecord {
+  seq: number;
+  ts: string;
+  provider: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  duration_ms: number;
+  status_code: number;
+  request_hash: string;
+  response_hash: string;
+  token_extraction: "exact" | "fallback" | "unknown";
+}
+
+export interface ConstraintViolation {
+  type: "token_budget" | "call_limit" | "model_violation" | "network_blocked";
+  detail: string;
+  seq: number;
+  ts: string;
+}
+
+export interface ActivitySummary {
+  files_read: number;
+  files_written: number;
+  commands_run: number;
+  unique_tools: string[];
+}
+
+export interface CostEstimate {
+  total_usd: number;
+  by_model: Record<string, number>;
+  pricing_version: string;
+}
+
+/** Proxy-observable harness fingerprint included in every attestation. */
+export interface AttestationHarnessSnapshot {
+  system_prompt_hash: string | null;
+  tool_definitions_hash: string | null;
+  tools_observed: string[];
+  models_used: string[];
+}
+
+export interface VerifiedAttestation {
+  image_digest: string;
+  nonce: string;
+  chain_head_hash: string;
+  chain_length: number;
+  llm_calls: LLMCallRecord[];
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_llm_calls: number;
+  total_tool_calls: number;
+  wall_clock_secs: number;
+  harness_snapshot?: AttestationHarnessSnapshot;
+  estimated_cost?: CostEstimate;
+  activity_summary?: ActivitySummary;
+  constraint_violations?: ConstraintViolation[];
+}
+
+export interface MatchHarnessSnapshot {
+  claimed_id: string;
+  claimed_version: string | null;
+  system_prompt_hash: string | null;
+  tool_definitions_hash: string | null;
+  tools_observed: string[];
+  models_used: string[];
+}
+
+export interface VerificationResult {
+  status: "verified" | "failed";
+  checks: {
+    nonce_match: boolean;
+    chain_integrity: boolean;
+    image_digest_known: boolean;
+    timing_consistent: boolean;
+    token_count_consistent: boolean;
+  };
+  errors: string[];
+  verified_at: string;
+}
+
+export interface ChallengeVerificationPolicy {
+  mode: "optional" | "recommended" | "required";
+  memorylessRecommended?: boolean;
+  verifiedConstraints?: ChallengeConstraints;
+}
+
+export interface ChallengeDisclosurePolicy {
+  replayVisibility: "private" | "delayed_public" | "public_opt_in";
+  redactSubmissionUntil: "never" | "version_rotated" | "challenge_archived";
+  benchmarkSeedExposure: "normal" | "restricted";
+}
+
+// ── Benchmark Metrics ───────────────────────────────────────────────
+
+export interface BenchmarkMetrics {
+  pass_at_1?: number;       // P(first attempt wins) — cold capability
+  best_of_3?: number;       // mean(max score from first 3 attempts per agent) — capability
+  best_of_5?: number;       // mean(max score from first 5 attempts per agent) — capability
+  pass_k_3?: number;        // P(all first 3 attempts win) — reliability
+  pass_k_5?: number;        // P(all first 5 attempts win) — reliability
+  learning_curve?: {        // mean score improvement from attempt 1→2→3
+    attempt_1_mean?: number;
+    attempt_2_mean?: number;
+    attempt_3_mean?: number;
+  };
+  agents_sampled?: number;  // number of agents with enough data for metrics
+}
+
 // ── Workspace-based Challenge Spec ──────────────────────────────────
 
 /** How the workspace is generated and delivered. */
@@ -217,6 +328,10 @@ export interface ChallengeConstraints {
   maxToolCalls?: number;
   allowedTools?: string[];
   networkAccess?: boolean;
+  // New (container-only enforcement)
+  maxLlmCalls?: number;
+  allowedModels?: string[];
+  maxCostUsd?: number;
 }
 
 /** Calibration data for difficulty auto-adjustment. */

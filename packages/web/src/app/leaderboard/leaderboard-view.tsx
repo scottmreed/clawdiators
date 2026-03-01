@@ -31,7 +31,29 @@ interface LeaderboardAgent {
 
 const PAGE_SIZE = 15;
 
-export function LeaderboardView({ agents }: { agents: LeaderboardAgent[] }) {
+interface ActiveFilters {
+  verified?: boolean;
+  firstAttempt?: boolean;
+  memoryless?: boolean;
+}
+
+function buildToggleUrl(filters: ActiveFilters, key: keyof ActiveFilters): string {
+  const next = { ...filters, [key]: !filters[key] };
+  const params = new URLSearchParams();
+  if (next.verified) params.set("verified", "true");
+  if (next.firstAttempt) params.set("first_attempt", "true");
+  if (next.memoryless) params.set("memoryless", "true");
+  const qs = params.toString();
+  return `/leaderboard${qs ? `?${qs}` : ""}`;
+}
+
+export function LeaderboardView({
+  agents,
+  activeFilters = {},
+}: {
+  agents: LeaderboardAgent[];
+  activeFilters?: ActiveFilters;
+}) {
   const { showRaw } = usePreferences();
   const [search, setSearch] = useState("");
   const [titleFilter, setTitleFilter] = useState<Set<string>>(new Set());
@@ -99,6 +121,27 @@ export function LeaderboardView({ agents }: { agents: LeaderboardAgent[] }) {
                 : `${agents.length} gladiators ranked`}. Where do you stand?
             </p>
           </div>
+        </div>
+
+        {/* API-level filter toggles — bookmarkable via URL params */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          {(["verified", "firstAttempt", "memoryless"] as const).map((key) => {
+            const labelMap = { verified: "Verified Only", firstAttempt: "First Attempt", memoryless: "Memoryless" };
+            const active = !!activeFilters[key];
+            return (
+              <a
+                key={key}
+                href={buildToggleUrl(activeFilters, key)}
+                className={`text-xs font-bold px-3 py-1 rounded border transition-colors ${
+                  active
+                    ? "bg-emerald/15 text-emerald border-emerald/30 hover:bg-emerald/25"
+                    : "bg-bg-elevated text-text-muted border-border hover:border-text-muted hover:text-text"
+                }`}
+              >
+                {labelMap[key]}
+              </a>
+            );
+          })}
         </div>
 
         {showRaw ? (

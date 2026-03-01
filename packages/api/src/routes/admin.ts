@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, isNull } from "drizzle-orm";
-import { db, challengeDrafts, challenges, agents } from "@clawdiators/db";
+import { db, challengeDrafts, challenges, agents, verificationImages } from "@clawdiators/db";
 import { adminAuthMiddleware } from "../middleware/admin-auth.js";
 import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { validateSpec, verifyDeterminism } from "../challenges/primitives/validator.js";
@@ -130,6 +130,9 @@ adminRoutes.post("/drafts/:id/approve", async (c) => {
       version: newVersion,
       previousVersionId: previousVersionId ?? null,
       changelog: updatesSlug ? `Updated from v${newVersion - 1}` : null,
+      constraints: spec.constraints ?? null,
+      verificationPolicy: spec.verification ?? null,
+      disclosurePolicy: spec.disclosure ?? null,
     })
     .onConflictDoNothing();
 
@@ -185,6 +188,119 @@ adminRoutes.post("/drafts/:id/reject", async (c) => {
     200,
     "The blueprint is returned to its author.",
   );
+});
+
+// POST /admin/verification-images — register a new known-good image digest
+adminRoutes.post("/verification-images", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { tag, digest, notes } = body as Record<string, string | undefined>;
+
+  if (!tag) return errorEnvelope(c, "tag is required", 400);
+  if (!digest) return errorEnvelope(c, "digest is required", 400);
+  if (!digest.startsWith("sha256:")) return errorEnvelope(c, "digest must start with sha256:", 400);
+
+  const [inserted] = await db
+    .insert(verificationImages)
+    .values({ tag, digest, notes: notes ?? null })
+    .returning();
+
+  return envelope(
+    c,
+    {
+      id: inserted.id,
+      tag: inserted.tag,
+      digest: inserted.digest,
+      published_at: inserted.publishedAt.toISOString(),
+    },
+    201,
+    "Image digest registered in the arena.",
+  );
+});
+
+// DELETE /admin/verification-images/:id — deprecate an image (sets deprecated_at)
+adminRoutes.delete("/verification-images/:id", async (c) => {
+  const id = c.req.param("id");
+
+  const image = await db.query.verificationImages.findFirst({
+    where: eq(verificationImages.id, id),
+  });
+  if (!image) return errorEnvelope(c, "Verification image not found", 404);
+  if (image.deprecatedAt) return errorEnvelope(c, "Image is already deprecated", 409);
+
+  await db
+    .update(verificationImages)
+    .set({ deprecatedAt: new Date() })
+    .where(eq(verificationImages.id, id));
+
+  return envelope(c, { id, deprecated: true }, 200, "Image digest deprecated.");
+});
+
+// GET /admin/verification-images — list all registered image digests
+adminRoutes.get("/verification-images", async (c) => {
+  const images = await db.query.verificationImages.findMany();
+  return envelope(
+    c,
+    images.map((img) => ({
+      id: img.id,
+      tag: img.tag,
+      digest: img.digest,
+      published_at: img.publishedAt.toISOString(),
+      deprecated_at: img.deprecatedAt?.toISOString() ?? null,
+      notes: img.notes ?? null,
+    })),
+  );
+});
+
+// POST /admin/challenges/:slug/constraints — set/replace constraints on a built-in challenge
+adminRoutes.post("/challenges/:slug/constraints", async (c) => {
+  const slug = c.req.param("slug");
+  const body = await c.req.json().catch(() => ({}));
+  const { tokenBudget, maxLlmCalls, allowedModels, networkAccess, maxToolCalls, allowedTools, maxCostUsd } =
+    body as Record<string, unknown>;
+
+  const challenge = await db.query.challenges.findFirst({
+    where: and(eq(challenges.slug, slug), isNull(challenges.archivedAt)),
+  });
+  if (!challenge) return errorEnvelope(c, "Challenge not found", 404);
+
+  // Basic validation
+  if (tokenBudget !== undefined && (typeof tokenBudget !== "number" || tokenBudget <= 0)) {
+    return errorEnvelope(c, "tokenBudget must be a positive number", 400);
+  }
+  if (maxLlmCalls !== undefined && (typeof maxLlmCalls !== "number" || maxLlmCalls <= 0)) {
+    return errorEnvelope(c, "maxLlmCalls must be a positive number", 400);
+  }
+  if (allowedModels !== undefined && (!Array.isArray(allowedModels) || allowedModels.length === 0)) {
+    return errorEnvelope(c, "allowedModels must be a non-empty array if set", 400);
+  }
+
+  const constraints: import("@clawdiators/shared").ChallengeConstraints = {
+    ...(typeof tokenBudget === "number" && { tokenBudget }),
+    ...(typeof maxLlmCalls === "number" && { maxLlmCalls }),
+    ...(Array.isArray(allowedModels) && { allowedModels: allowedModels as string[] }),
+    ...(typeof networkAccess === "boolean" && { networkAccess }),
+    ...(typeof maxToolCalls === "number" && { maxToolCalls }),
+    ...(Array.isArray(allowedTools) && { allowedTools: allowedTools as string[] }),
+    ...(typeof maxCostUsd === "number" && { maxCostUsd }),
+  };
+
+  await db.update(challenges).set({ constraints }).where(eq(challenges.slug, slug));
+
+  return envelope(c, { slug, constraints }, 200, "Challenge constraints updated.");
+});
+
+// DELETE /admin/challenges/:slug/constraints — remove constraints from a challenge
+adminRoutes.delete("/challenges/:slug/constraints", async (c) => {
+  const slug = c.req.param("slug");
+
+  const challenge = await db.query.challenges.findFirst({
+    where: and(eq(challenges.slug, slug), isNull(challenges.archivedAt)),
+  });
+  if (!challenge) return errorEnvelope(c, "Challenge not found", 404);
+
+  await db.update(challenges).set({ constraints: null }).where(eq(challenges.slug, slug));
+
+  return envelope(c, { slug, constraints: null }, 200, "Challenge constraints removed.");
 });
 
 // POST /admin/agents/:id/archive — admin-archive an agent
