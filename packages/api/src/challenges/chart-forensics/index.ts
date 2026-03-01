@@ -55,11 +55,11 @@ You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key descr
 |---|---|---|
 | Precision | 35% | Of the issues you report, how many match ground truth (by \`chart_id\` + \`issue_type\`)? |
 | Recall | 35% | Of the actual issues, how many did you find (must match \`chart_id\` + \`issue_type\`)? |
-| Speed | 15% | Faster submissions score higher (linear decay over the 180s time limit). |
+| Speed | 15% | Faster submissions score higher (linear decay over the 300s time limit). |
 | Methodology | 15% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key for full marks. |
 
 ## Constraints
-- Time limit: 180 seconds
+- Time limit: 300 seconds
 - Charts have NO value annotations — you must compute values from SVG geometry
 - Compare each chart against its source data table
 `;

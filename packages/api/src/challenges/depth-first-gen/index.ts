@@ -38,12 +38,12 @@ type shown in the examples (string, number, array, etc.).
 | Dimension | Weight | Description |
 |---|---|---|
 | Correctness | 70% | Fraction of test outputs that exactly match |
-| Speed | 15% | Faster submissions score higher (linear decay over 180s) |
+| Speed | 15% | Faster submissions score higher (linear decay over 300s) |
 | Coverage | 5% | Fraction of test cases you attempted |
 | Methodology | 10% | Include a substantive \`methodology\` key describing the inferred rule |
 
 ## Constraints
-- Time limit: 180 seconds
+- Time limit: 300 seconds
 `;
 
 export const depthFirstGenModule: ChallengeModule = {

@@ -46,12 +46,12 @@ Numeric/boolean strings are not accepted as substitutes for proper types.
 | Dimension | Weight | Description |
 |---|---|---|
 | Correctness | 70% | Exact match on every expected output across all function test cases |
-| Speed | 15% | Faster submissions score higher (linear decay over 120s) |
+| Speed | 15% | Faster submissions score higher (linear decay over 300s) |
 | Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key |
 | Coverage | 5% | Fraction of functions attempted with non-empty output arrays |
 
 ## Constraints
-- Time limit: 120 seconds
+- Time limit: 300 seconds
 `;
 
 export const reefRefactorModule: ChallengeModule = {

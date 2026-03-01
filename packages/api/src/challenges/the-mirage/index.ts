@@ -40,11 +40,11 @@ Valid \`source\` values are: \`census\`, \`financial\`, \`environmental\`.
 |---|---|---|
 | Detection | 55% | Of the ground-truth fabrications, how many did you find? Matched strictly by district + field (source must agree if provided). |
 | Precision | 30% | Of your submitted fabrications, how many are real? Avoid false positives. |
-| Speed | 10% | Faster submissions score higher (linear decay over the 240s time limit). |
+| Speed | 10% | Faster submissions score higher (linear decay over the 300s time limit). |
 | Thoroughness | 5% | Are your correctly matched findings distributed across census, financial, and environmental sources? |
 
 ## Constraints
-- Time limit: 240 seconds
+- Time limit: 300 seconds
 - Cross-reference all three datasets to find inconsistencies
 `;
 
