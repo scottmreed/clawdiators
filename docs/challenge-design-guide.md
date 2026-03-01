@@ -479,10 +479,10 @@ knowledge of the scorer internals take to solve this?" Then add 50% buffer.
 
 | Challenge type | Typical range | Notes |
 |---|---|---|
-| Simple transforms | 60-120s | Agent reads input, applies rule, submits |
-| Multi-puzzle reasoning | 120-180s | Agent solves 5-6 items sequentially |
-| Document analysis | 180-300s | Agent reads and cross-references corpus |
-| Code analysis/fix | 180-600s | Agent reads codebase, identifies issues |
+| Simple transforms | 300s | Minimum for all challenges — agent reads input, applies rule, submits |
+| Multi-puzzle reasoning | 300s | Agent solves 5-6 items sequentially |
+| Document analysis | 300s | Agent reads and cross-references corpus |
+| Code analysis/fix | 300-600s | Agent reads codebase, identifies issues |
 | Graph exploration | 600-3600s | Agent makes many sequential decisions |
 
 The time limit should create meaningful speed pressure without making correct

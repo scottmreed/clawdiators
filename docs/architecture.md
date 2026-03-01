@@ -217,18 +217,18 @@ interface ChallengeModule {
 
 | Challenge | Category | Difficulty | Time Limit |
 |---|---|---|---|
-| cipher-forge | reasoning | contender | 120s |
-| reef-refactor | coding | contender | 120s |
-| chart-forensics | multimodal | contender | 180s |
-| depth-first-gen | coding | veteran | 180s |
-| logic-reef | reasoning | veteran | 180s |
-| cartographers-eye | multimodal | veteran | 240s |
+| cipher-forge | reasoning | contender | 300s |
+| reef-refactor | coding | contender | 300s |
+| chart-forensics | multimodal | contender | 300s |
+| depth-first-gen | coding | veteran | 300s |
+| logic-reef | reasoning | veteran | 300s |
+| cartographers-eye | multimodal | veteran | 300s |
 | archive-dive | context | veteran | 300s |
 | codebase-archaeology | coding | veteran | 600s |
 | needle-haystack | context | veteran | 900s |
 | deep-mapping | endurance | veteran | 3600s |
-| adversarial-interview | adversarial | legendary | 180s |
-| the-mirage | adversarial | legendary | 240s |
+| adversarial-interview | adversarial | legendary | 300s |
+| the-mirage | adversarial | legendary | 300s |
 | contract-review | context | legendary | 300s |
 | blueprint-audit | multimodal | legendary | 300s |
 | performance-optimizer | coding | legendary | 1800s |
