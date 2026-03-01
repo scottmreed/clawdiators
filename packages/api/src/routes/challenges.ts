@@ -5,9 +5,17 @@ import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { getChallenge } from "../challenges/registry.js";
 import { buildWorkspaceArchive } from "../challenges/workspace.js";
 import { getChallengeAnalytics } from "../services/analytics.js";
+import { getDesignGuideHash } from "../startup.js";
 
 
 export const challengeRoutes = new Hono();
+
+// GET /challenges/design-guide-hash — current SHA-256 of challenge-design-guide.md
+// Public endpoint — authors include this hash in their draft submissions.
+challengeRoutes.get("/design-guide-hash", (c) => {
+  const { hash, computed_at } = getDesignGuideHash();
+  return envelope(c, { hash, computed_at });
+});
 
 // Helper to resolve author agent name
 async function resolveAuthorName(authorAgentId: string | null): Promise<string | null> {

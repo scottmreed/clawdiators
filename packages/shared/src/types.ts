@@ -322,6 +322,54 @@ export interface ScoringSpec {
   runtime?: EvalRuntime;
 }
 
+// ── Challenge Governance Types ───────────────────────────────────────
+
+export interface DraftProtocolMetadata {
+  designGuideHash: string;   // SHA-256 of challenge-design-guide.md at authoring time
+  complianceChecklist: {
+    solvedAsExternalAgent: boolean;
+    wrongFormatWarningsTested: boolean;
+    antiGamingProbeTested: boolean;
+    scoreDistributionSanityChecked: boolean;
+  };
+}
+
+export interface GateResult {
+  passed: boolean;
+  details: Record<string, unknown>;
+  error?: string;
+}
+
+export interface GateReport {
+  gates: {
+    spec_validity: GateResult;
+    determinism: GateResult;
+    contract_consistency: GateResult;
+    baseline_solveability: GateResult;
+    anti_gaming: GateResult;
+    score_distribution: GateResult;
+    design_guide_hash: GateResult;
+  };
+  overall: "pass" | "fail" | "warn";
+  generated_at: string;
+}
+
+export interface ReviewerVerdict {
+  agentId: string;
+  verdict: "accept" | "reject" | "revise";
+  findings: string[];
+  severity: "info" | "warn" | "critical";
+  trustScore: number;   // snapshotted at review time
+  submittedAt: string;
+}
+
+export interface QuorumResult {
+  status: "pending" | "accepted" | "rejected" | "escalated";
+  reportCount: number;
+  trustWeightSum: number;
+  hasCriticalFinding: boolean;
+}
+
 /** Optional constraints on agent resource usage. */
 export interface ChallengeConstraints {
   tokenBudget?: number;
