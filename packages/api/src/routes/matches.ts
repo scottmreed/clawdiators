@@ -64,6 +64,21 @@ matchRoutes.post(
       return errorEnvelope(c, "Challenge module not implemented", 501, "This trial is still being forged in the arena.");
     }
 
+    // Derive API base URL from request headers (used in CHALLENGE.md template + verification response)
+    const proto = c.req.header("x-forwarded-proto") ?? "http";
+    const host = c.req.header("host") ?? "localhost:3001";
+    const apiBaseUrl = `${proto}://${host}`;
+
+    // Look up the latest known-good arena-runner image digest (needed for both re-enter and new match)
+    let knownImageDigest: string | null = null;
+    if (verified) {
+      const latestImage = await db.query.verificationImages.findFirst({
+        where: isNull(verificationImages.deprecatedAt),
+        orderBy: desc(verificationImages.publishedAt),
+      });
+      knownImageDigest = latestImage?.digest ?? null;
+    }
+
     // Check for existing active match
     const existingActive = await db.query.matches.findFirst({
       where: and(
@@ -95,6 +110,8 @@ matchRoutes.post(
               nonce: existingActive.verificationNonce ?? undefined,
               proxyStartToken: existingActive.proxyStartToken ?? undefined,
               matchId: existingActive.id,
+              imageDigest: knownImageDigest ?? undefined,
+              apiBaseUrl,
             })
           : null;
         const existingWorkspaceUrl = existingActive.verified
@@ -118,6 +135,10 @@ matchRoutes.post(
           verification: existingActive.verified ? {
             nonce: existingActive.verificationNonce,
             proxy_start_token: existingActive.proxyStartToken ?? undefined,
+            image_digest: knownImageDigest ?? undefined,
+            image: "arena-runner:latest",
+            runner_url: "ghcr.io/clawdiators-ai/arena-runner:latest",
+            api_base_url: apiBaseUrl,
             proxy_active: !!existingActive.proxyActiveAt,
           } : undefined,
           challenge: existingChallenge ? {
@@ -154,16 +175,6 @@ matchRoutes.post(
     const expiresAt = new Date(now.getTime() + challenge.timeLimitSecs * 1000);
     const verificationNonce = verified ? generateNonce() : null;
     const proxyStartToken = verified ? generateNonce() : null;
-
-    // Look up the latest known-good arena-runner image digest for verified matches
-    let knownImageDigest: string | null = null;
-    if (verified) {
-      const latestImage = await db.query.verificationImages.findFirst({
-        where: isNull(verificationImages.deprecatedAt),
-        orderBy: desc(verificationImages.publishedAt),
-      });
-      knownImageDigest = latestImage?.digest ?? null;
-    }
 
     // Compute attempt number (count previous completed matches for this agent+challenge)
     const [{ count: previousCompleted }] = await db
@@ -237,6 +248,7 @@ matchRoutes.post(
               proxyStartToken: proxyStartToken ?? undefined,
               matchId: match.id,
               imageDigest: knownImageDigest ?? undefined,
+              apiBaseUrl,
             })
           : null,
         submission_spec: mod.submissionSpec ?? null,
@@ -250,6 +262,7 @@ matchRoutes.post(
           image_digest: knownImageDigest ?? "sha256:unknown",
           image: "arena-runner:latest",
           runner_url: "ghcr.io/clawdiators-ai/arena-runner:latest",
+          api_base_url: apiBaseUrl,
         } : undefined,
         constraints: challenge.constraints ? {
           ...challenge.constraints,
