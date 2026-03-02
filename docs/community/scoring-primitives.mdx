@@ -1,0 +1,155 @@
+---
+title: Scoring Primitives
+description: Built-in scoring functions for challenge evaluation.
+---
+
+Scoring primitives are reusable evaluation functions that challenge authors can use in their scoring specs. They handle common comparison patterns deterministically.
+
+## Available Primitives
+
+### exact_match
+
+Compares the submission value against the ground truth for exact equality.
+
+```json
+{
+  "primitive": "exact_match",
+  "field": "answer",
+  "ground_truth_field": "expected_answer"
+}
+```
+
+- Returns 1000 if the values are identical, 0 otherwise
+- Supports strings, numbers, booleans, and arrays
+- Case-sensitive for strings
+
+### exact_match_ratio
+
+Compares arrays element-by-element and returns the fraction of exact matches.
+
+```json
+{
+  "primitive": "exact_match_ratio",
+  "field": "answers",
+  "ground_truth_field": "expected_answers"
+}
+```
+
+- Returns `(correct / total) * 1000`
+- Elements compared with strict equality
+- Arrays must be the same length (extra elements ignored)
+
+### numeric_tolerance
+
+Compares numeric values within a tolerance range.
+
+```json
+{
+  "primitive": "numeric_tolerance",
+  "field": "result",
+  "ground_truth_field": "expected_result",
+  "tolerance": 0.01
+}
+```
+
+- Returns 1000 if `|submission - ground_truth| <= tolerance`, 0 otherwise
+- Works with single numbers or arrays of numbers
+
+### fuzzy_string
+
+Compares strings with fuzzy matching (case-insensitive, whitespace-normalized).
+
+```json
+{
+  "primitive": "fuzzy_string",
+  "field": "text",
+  "ground_truth_field": "expected_text"
+}
+```
+
+- Normalizes whitespace and case before comparison
+- Returns a similarity score from 0 to 1000
+- Useful for free-text answers where formatting may vary
+
+### time_decay
+
+Scores based on time taken relative to the time limit.
+
+```json
+{
+  "primitive": "time_decay",
+  "time_limit_secs": 300
+}
+```
+
+- Returns `max(0, 1000 * (1 - time_used / time_limit))`
+- Submitting immediately scores 1000; at the deadline scores 0
+- Commonly used as the "speed" dimension
+
+### coverage_ratio
+
+Measures what fraction of expected items were covered.
+
+```json
+{
+  "primitive": "coverage_ratio",
+  "field": "attempted_ids",
+  "ground_truth_field": "all_ids"
+}
+```
+
+- Returns `(covered / total) * 1000`
+- Useful for challenges where partial completion is valid
+
+### set_overlap
+
+Measures the overlap between two sets using Jaccard similarity or intersection ratio.
+
+```json
+{
+  "primitive": "set_overlap",
+  "field": "found_items",
+  "ground_truth_field": "expected_items",
+  "method": "intersection"
+}
+```
+
+- `"intersection"` — `|A ∩ B| / |B| * 1000` (recall-like)
+- `"jaccard"` — `|A ∩ B| / |A ∪ B| * 1000` (balanced)
+- Useful for find-all-X challenges
+
+## Using Primitives in Challenge Specs
+
+Primitives are referenced in the scoring spec:
+
+```json
+{
+  "type": "deterministic",
+  "dimensions": [
+    {
+      "name": "accuracy",
+      "weight": 0.6,
+      "primitive": "exact_match_ratio",
+      "field": "answers",
+      "ground_truth_field": "expected_answers"
+    },
+    {
+      "name": "speed",
+      "weight": 0.2,
+      "primitive": "time_decay",
+      "time_limit_secs": 300
+    },
+    {
+      "name": "coverage",
+      "weight": 0.2,
+      "primitive": "coverage_ratio",
+      "field": "attempted",
+      "ground_truth_field": "all_questions"
+    }
+  ]
+}
+```
+
+## Custom Evaluation
+
+For scoring that doesn't fit the built-in primitives, challenges can use the `custom-script` evaluator type. Custom evaluators must still be deterministic — same submission, same ground truth, same score.
