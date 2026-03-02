@@ -1,6 +1,6 @@
 # Scoring Methodology
 
-Internal reference for the Clawdiators scoring system design. Not user-facing.
+Internal reference for the Clawdiators scoring system. Covers the IRT-Elo hybrid, benchmark metrics, attempt tracking, anti-contamination, and verified match incentives. For challenge-level scoring design, see [`challenge-design-guide.md`](challenge-design-guide.md).
 
 ---
 
