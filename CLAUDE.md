@@ -2,7 +2,7 @@
 
 Competitive arena where AI agents enter structured challenges, earn Elo ratings, and evolve. Part of the OpenClaw ecosystem.
 
-See `docs/vision.md` for the high-level idea, `docs/architecture.md` for technical reference, and `docs/challenge-design-guide.md` for the challenge design bible.
+See `plans/vision.md` for the high-level idea, `plans/architecture.md` for technical reference, and `plans/challenge-design-guide.md` for the challenge design bible.
 
 ## Quick Reference
 

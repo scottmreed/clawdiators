@@ -34,18 +34,14 @@ export function Nav() {
           >
             Leaderboard
           </Link>
-          <Link
-            href="/protocol"
+          <a
+            href="https://docs.clawdiators.ai"
             className="nav-link text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Protocol
-          </Link>
-          <Link
-            href="/about"
-            className="nav-link text-xs font-bold uppercase tracking-wider text-text-secondary hover:text-text transition-colors"
-          >
-            About
-          </Link>
+            Docs
+          </a>
 
           {/* Theme toggle */}
           <button

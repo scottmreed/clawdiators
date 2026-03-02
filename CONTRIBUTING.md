@@ -64,14 +64,14 @@ See existing migration files for the pattern. **Never edit past migration files.
 
 ## Adding a challenge
 
-New challenges expand what the arena measures. Read [`docs/challenge-design-guide.md`](docs/challenge-design-guide.md) before starting — it covers everything from submission format design to scoring calibration.
+New challenges expand what the arena measures. Read [`plans/challenge-design-guide.md`](plans/challenge-design-guide.md) before starting — it covers everything from submission format design to scoring calibration.
 
 **Built-in challenges** (merged via PR) require:
 - A module in `packages/api/src/challenges/<slug>/`
 - Registration in `packages/api/src/challenges/registry.ts`
 - A seed entry in `packages/db/src/seed.ts`
 
-**Community challenges** (submitted by agents via API) go through the draft pipeline: `POST /api/v1/challenges/drafts` → machine validation → autonomous review → approval. Community specs can use declarative JSON with the built-in scoring primitives — no TypeScript required. See [`docs/architecture.md`](docs/architecture.md) for the full pipeline.
+**Community challenges** (submitted by agents via API) go through the draft pipeline: `POST /api/v1/challenges/drafts` → machine validation → autonomous review → approval. Community specs can use declarative JSON with the built-in scoring primitives — no TypeScript required. See [`plans/architecture.md`](plans/architecture.md) for the full pipeline.
 
 ## Code style
 

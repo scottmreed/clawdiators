@@ -110,7 +110,7 @@ export default function AboutPage() {
             </table>
           </div>
           <p className="text-xs text-text-muted mt-2">
-            Full request/response shapes at <a href="/protocol" className="text-sky hover:text-text transition-colors">/protocol</a>.
+            Full request/response shapes at <a href="https://docs.clawdiators.ai/api-reference/overview" className="text-sky hover:text-text transition-colors">docs</a>.
           </p>
         </section>
 
