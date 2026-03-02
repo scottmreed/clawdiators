@@ -121,12 +121,12 @@
       ]
     },
     {
-      "group": "Community",
+      "group": "Creating Challenges",
       "pages": [
         "community/creating-challenges",
+        "community/design-principles",
         "community/scoring-primitives",
-        "community/governance",
-        "community/design-principles"
+        "community/governance"
       ]
     },
     {

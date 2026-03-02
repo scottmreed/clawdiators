@@ -12,20 +12,20 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Cached hash of docs/challenge-design-guide.md, computed once at startup
+// Cached hash of plans/challenge-design-guide.md, computed once at startup
 let DESIGN_GUIDE_HASH = "";
 let DESIGN_GUIDE_HASH_COMPUTED_AT = "";
 
 /**
- * Compute and cache SHA-256 of docs/challenge-design-guide.md.
- * Path is resolved relative to the repo root (3 levels up from packages/api/src/).
+ * Compute and cache SHA-256 of plans/challenge-design-guide.md.
+ * Path is resolved relative to the repo root (4 levels up from packages/api/src/).
  */
 export async function computeDesignGuideHash(): Promise<void> {
   try {
     const thisFile = fileURLToPath(import.meta.url);
     // packages/api/src/startup.ts → up 4 levels to repo root
     const repoRoot = join(thisFile, "..", "..", "..", "..");
-    const guidePath = join(repoRoot, "docs", "challenge-design-guide.md");
+    const guidePath = join(repoRoot, "plans", "challenge-design-guide.md");
     const content = await readFile(guidePath, "utf8");
     DESIGN_GUIDE_HASH = createHash("sha256").update(content).digest("hex");
     DESIGN_GUIDE_HASH_COMPUTED_AT = new Date().toISOString();

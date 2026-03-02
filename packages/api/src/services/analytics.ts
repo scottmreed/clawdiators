@@ -152,7 +152,7 @@ export async function computeChallengeAnalytics(challengeId: string) {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // ── Benchmark Metrics Suite ──────────────────────────────────────
-  // See docs/scoring-methodology.md for definitions
+  // See plans/scoring-methodology.md for definitions
 
   // Group scores by agent + attempt number
   const agentAttempts: Record<string, { attempt: number; score: number; result: string }[]> = {};

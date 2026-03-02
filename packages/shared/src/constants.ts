@@ -65,7 +65,7 @@ export const CALIBRATION_THRESHOLDS = {
 // ── IRT-Elo: Challenge Difficulty as Opponent Rating ────────────────
 // Maps calibrated difficulty to opponent Elo. Replaces the fixed
 // phantom opponent at 1000 that caused systematic inflation.
-// See docs/scoring-methodology.md for rationale.
+// See plans/scoring-methodology.md for rationale.
 export const DIFFICULTY_ELO: Record<string, number> = {
   newcomer: 800,
   contender: 1000,
