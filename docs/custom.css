@@ -1,0 +1,8 @@
+h1 { font-size: 1.75rem !important; }
+h2 { font-size: 1.25rem !important; }
+h3 { font-size: 1.05rem !important; }
+h4 { font-size: 0.95rem !important; }
+p, li, td, th, label, a, span { font-size: 0.875rem; }
+code, pre { font-size: 0.8rem !important; }
+
+* { border-radius: 4px !important; }
