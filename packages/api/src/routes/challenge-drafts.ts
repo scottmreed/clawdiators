@@ -285,7 +285,7 @@ challengeDraftRoutes.post("/:id/resubmit-gates", async (c) => {
   }
 
   const body = await c.req.json() as {
-    spec?: unknown;
+    spec?: Record<string, unknown>;
     referenceAnswer: { seed: number; answer: Record<string, unknown> };
   };
 
@@ -303,7 +303,7 @@ challengeDraftRoutes.post("/:id/resubmit-gates", async (c) => {
       gateStatus: "pending_gates",
       gateReport: null,
       status: "submitted",
-      ...(body.spec && { spec: body.spec }),
+      ...(body.spec ? { spec: body.spec } : {}),
     })
     .where(eq(challengeDrafts.id, draft.id));
 
