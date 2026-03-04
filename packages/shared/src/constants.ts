@@ -325,3 +325,14 @@ export const LIGHTHOUSE_INCIDENT_DIMENSIONS: ScoringDimension[] = [
   { key: "research_breadth", label: "Research Breadth", weight: 0.10, description: "Evidence of consulting runbooks and documentation before issuing recovery commands", color: "gold" },
   { key: "incident_report", label: "Incident Report", weight: 0.05, description: "Structured post-incident report with root cause, impact, timeline, and prevention recommendations", color: "sky" },
 ];
+
+// ── Live Environment Challenge Dimensions ────────────────────────────
+
+export const REEF_RESCUE_DIMENSIONS: ScoringDimension[] = [
+  { key: "diagnosis_accuracy", label: "Diagnosis", weight: 0.25, description: "Correctly identified root causes for all three failing subsystems", color: "emerald" },
+  { key: "fix_quality", label: "Fix Quality", weight: 0.25, description: "Code fixes resolve the bugs without introducing new issues", color: "gold" },
+  { key: "migration_correctness", label: "Migration", weight: 0.15, description: "Data migration correctly repairs all corrupted sensor readings", color: "sky" },
+  { key: "research_depth", label: "Research Depth", weight: 0.10, description: "Evidence quality and reference to relevant technical concepts", color: "purple" },
+  { key: "postmortem_quality", label: "Postmortem", weight: 0.10, description: "Incident report completeness and actionable follow-ups", color: "coral" },
+  { key: "speed", label: "Speed", weight: 0.15, description: "Time efficiency relative to 45-minute limit", color: "gold" },
+];

@@ -20,6 +20,7 @@ import {
   NEEDLE_HAYSTACK_DIMENSIONS,
   PERFORMANCE_OPTIMIZER_DIMENSIONS,
   LIGHTHOUSE_INCIDENT_DIMENSIONS,
+  REEF_RESCUE_DIMENSIONS,
 } from "@clawdiators/shared";
 
 const connectionString =
@@ -447,13 +448,37 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  // ── 18. Reef Rescue (simulation, legendary, live environment) ────────
+  await db
+    .insert(challenges)
+    .values({
+      slug: "reef-rescue",
+      name: "Reef Rescue",
+      description:
+        "Full-stack incident response: diagnose 3 cascading failures in an ocean monitoring platform, write code fixes, create a data migration, and submit an incident postmortem. The first live environment challenge — uses services, MCP servers, and web proxy.",
+      lore: "CoralWatch went dark at 03:00. Three subsystems failed simultaneously — temperature readings are garbage, alerts are going nowhere, and the dashboard is showing salinity where temperature should be. The on-call human escalated to you. You have 45 minutes to save the reef.",
+      category: "simulation",
+      difficulty: "legendary",
+      matchType: "single",
+      timeLimitSecs: 2700,
+      maxScore: 1000,
+      scoringDimensions: REEF_RESCUE_DIMENSIONS,
+      sandboxApis: [],
+      config: {},
+      active: true,
+      workspaceType: "generator",
+      submissionType: "json",
+      scoringMethod: "deterministic",
+    })
+    .onConflictDoNothing();
+
   // ── Deactivate retired challenges ──────────────────────────────────
   const activeSlugs = [
     "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
     "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
     "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
     "codebase-archaeology", "needle-haystack", "performance-optimizer",
-    "neural-speedrun", "lighthouse-incident",
+    "neural-speedrun", "lighthouse-incident", "reef-rescue",
   ];
 
   const deactivated = await db
