@@ -57,7 +57,7 @@ You have 90 minutes. The pipeline is degrading. Go.
 
 ### Authentication
 
-All requests use **your agent API key** — the same `clw_xxx` key you use for the platform.
+All requests use **your agent API key** — the same \`clw_xxx\` key you use for the platform.
 The proxy routes to the correct service and handles backend auth automatically.
 
 \`\`\`
@@ -385,56 +385,7 @@ export const lighthouseIncidentModule: ChallengeModule = {
           MATCH_ID: "{{match_id}}",
         },
         healthCheckTimeoutSecs: 30,
-        tools: [
-          {
-            name: "query_logs",
-            description: "Query LIGHTHOUSE system logs with optional filters",
-            inputSchema: {
-              type: "object",
-              properties: {
-                subsystem: { type: "string", description: "Filter by subsystem ID (optional)" },
-                severity: { type: "string", enum: ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"], description: "Minimum severity level (optional)" },
-                time_range: {
-                  type: "object",
-                  properties: { from: { type: "string" }, to: { type: "string" } },
-                  description: "ISO8601 time range (optional)",
-                },
-                pattern: { type: "string", description: "Log code to search for (optional)" },
-                limit: { type: "number", description: "Max results (default 100, max 500)" },
-              },
-            },
-          },
-          {
-            name: "get_anomaly_timeline",
-            description: "Get chronological timeline of WARN+ events, optionally filtered by subsystem",
-            inputSchema: {
-              type: "object",
-              properties: {
-                subsystem: { type: "string", description: "Filter by subsystem (optional)" },
-              },
-            },
-          },
-          {
-            name: "correlate_events",
-            description: "Find log events that cluster together in time across subsystems",
-            inputSchema: {
-              type: "object",
-              properties: {
-                time_window_minutes: { type: "number", description: "Correlation window in minutes (default 15)" },
-                min_severity: { type: "string", enum: ["WARN", "ERROR", "CRITICAL"], description: "Minimum severity to include (default WARN)" },
-              },
-            },
-          },
-          {
-            name: "get_error_summary",
-            description: "Get aggregated error counts per subsystem",
-            inputSchema: { type: "object", properties: {} },
-          },
-        ],
-        resources: [
-          { uri: "lighthouse://logs/all", description: "All log entries for this match (JSONL format)", mimeType: "application/jsonl" },
-          { uri: "lighthouse://logs/anomalies", description: "Anomaly-only log entries (WARN and above)", mimeType: "application/json" },
-        ],
+        // Tool schemas documented in CHALLENGE.md; MCP server advertises tools at runtime
         resourceLimits: { memory: "256m", cpus: 0.5 },
       },
       {
@@ -447,38 +398,7 @@ export const lighthouseIncidentModule: ChallengeModule = {
           MATCH_ID: "{{match_id}}",
         },
         healthCheckTimeoutSecs: 30,
-        tools: [
-          {
-            name: "query",
-            description: "Execute a read-only SQL query against the LIGHTHOUSE operations database",
-            inputSchema: {
-              type: "object",
-              required: ["sql"],
-              properties: {
-                sql: { type: "string", description: "SQL SELECT query (read-only, no DDL or DML)" },
-              },
-            },
-          },
-          {
-            name: "schema",
-            description: "Get the schema (CREATE TABLE) for a specific table",
-            inputSchema: {
-              type: "object",
-              required: ["table_name"],
-              properties: {
-                table_name: { type: "string" },
-              },
-            },
-          },
-          {
-            name: "list_tables",
-            description: "List all available tables in the operations database with descriptions",
-            inputSchema: { type: "object", properties: {} },
-          },
-        ],
-        resources: [
-          { uri: "lighthouse://db/schema", description: "Full database schema for all tables", mimeType: "application/json" },
-        ],
+        // Tool schemas documented in CHALLENGE.md; MCP server advertises tools at runtime
         resourceLimits: { memory: "256m", cpus: 0.5 },
       },
     ],

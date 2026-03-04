@@ -367,24 +367,25 @@ export function scoreLighthouse(input: ScoringInput): ScoreResult {
   const researchRaw = scoreResearchBreadth(sub, gt);       // 0-1000
   const reportRaw = scoreIncidentReport(sub, gt);          // 0-1000
 
-  // Apply dimension weights
-  const root_cause = Math.round(rootCauseRaw * 0.20);
-  const recovery = Math.round(recoveryRaw * 0.30);
-  const failure_chain = Math.round(failureChainRaw * 0.15);
-  const recovery_script = Math.round(recoveryScriptRaw * 0.20);
-  const research_breadth = Math.round(researchRaw * 0.10);
-  const incident_report = Math.round(reportRaw * 0.05);
+  // Merge research_breadth (10%) + incident_report (5%) into methodology (15%)
+  const methodologyRaw = Math.round(researchRaw * (0.10 / 0.15) + reportRaw * (0.05 / 0.15));
 
-  const total = root_cause + recovery + failure_chain + recovery_script + research_breadth + incident_report;
+  // Apply dimension weights
+  const correctness = Math.round(rootCauseRaw * 0.20);
+  const completeness = Math.round(recoveryRaw * 0.30);
+  const analysis = Math.round(failureChainRaw * 0.15);
+  const code_quality = Math.round(recoveryScriptRaw * 0.20);
+  const methodology = Math.round(methodologyRaw * 0.15);
+
+  const total = correctness + completeness + analysis + code_quality + methodology;
 
   return {
     breakdown: {
-      root_cause,
-      recovery,
-      failure_chain,
-      recovery_script,
-      research_breadth,
-      incident_report,
+      correctness,
+      completeness,
+      analysis,
+      code_quality,
+      methodology,
       total: Math.min(1000, total),
     },
   };

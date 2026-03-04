@@ -21,6 +21,8 @@ import {
   PERFORMANCE_OPTIMIZER_DIMENSIONS,
   LIGHTHOUSE_INCIDENT_DIMENSIONS,
   REEF_RESCUE_DIMENSIONS,
+  PIPELINE_BREACH_DIMENSIONS,
+  NEURAL_SPEEDRUN_DIMENSIONS,
 } from "@clawdiators/shared";
 
 const connectionString =
@@ -407,10 +409,7 @@ async function main() {
       matchType: "single",
       timeLimitSecs: 1800,
       maxScore: 1000,
-      scoringDimensions: [
-        { key: "speedup", label: "Speedup", weight: 0.8, description: "Steps ratio vs baseline (20x = max 800pts)", color: "emerald" },
-        { key: "loss_improvement", label: "Loss Quality", weight: 0.2, description: "MSE \u2264 1.05\u00d7 baseline = full 200pts", color: "gold" },
-      ],
+      scoringDimensions: NEURAL_SPEEDRUN_DIMENSIONS,
       sandboxApis: [],
       config: {},
       active: true,
@@ -472,13 +471,41 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  // ── 19. PIPELINE BREACH (simulation, legendary, environment) ──────────
+  await db
+    .insert(challenges)
+    .values({
+      slug: "pipeline-breach",
+      name: "PIPELINE BREACH — Supply Chain Attack Forensics",
+      description:
+        "A P0 security incident: your CI/CD pipeline has been compromised via a supply chain attack. Investigate build logs, artifact registries, and dependency manifests across 8 microservices. Identify the attack vector, trace the blast radius including transitive dependencies, execute prioritized remediation, and write a security advisory.",
+      lore: "The build passed. The tests passed. The deployment went smoothly. And somewhere in those 47 transitive dependencies, something that should not exist is now running in production. The security scanner caught it at 03:00 — anomalous network traffic during builds, checksums that do not match, a package that appeared in the registry 72 hours ago with no prior version history. Eight microservices. Four ecosystems. One compromised dependency. Find it before the attacker finds more secrets to exfiltrate.",
+      category: "simulation",
+      difficulty: "legendary",
+      matchType: "multi-checkpoint",
+      timeLimitSecs: 4500,
+      maxScore: 1000,
+      scoringDimensions: PIPELINE_BREACH_DIMENSIONS,
+      sandboxApis: [],
+      config: {
+        services: ["pipeline-api"],
+        mcpServers: ["mcp-build-logs", "mcp-artifact-db"],
+        proxy: { allowedDomains: ["docs.pipeline.internal"], rateLimit: 30 },
+      },
+      active: true,
+      workspaceType: "environment",
+      submissionType: "json",
+      scoringMethod: "environment",
+    })
+    .onConflictDoNothing();
+
   // ── Deactivate retired challenges ──────────────────────────────────
   const activeSlugs = [
     "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
     "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
     "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
     "codebase-archaeology", "needle-haystack", "performance-optimizer",
-    "neural-speedrun", "lighthouse-incident", "reef-rescue",
+    "neural-speedrun", "lighthouse-incident", "reef-rescue", "pipeline-breach",
   ];
 
   const deactivated = await db
@@ -524,7 +551,7 @@ async function main() {
       lore: "There are no shortcuts in the Full Clawloseum. Every challenge, every category, every difficulty. Only the most versatile agents earn the right to call themselves complete.",
       challengeSlugs: activeSlugs,
       scoringMethod: "sum",
-      maxScore: 17000,
+      maxScore: 19000,
     })
     .onConflictDoNothing();
 

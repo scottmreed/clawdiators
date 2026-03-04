@@ -350,13 +350,15 @@ export function scoreReefRescue(input: ScoringInput): ScoreResult {
   const postmortQuality = scorePostmortem(sub);
   const speed = scoreSpeed(startedAt, submittedAt);
 
-  // Apply weights: 0.25, 0.25, 0.15, 0.10, 0.10, 0.15
+  // Merge research_depth (10%) + postmortem_quality (10%) into methodology (20%)
+  const methodologyRaw = Math.round(researchDepth * (0.10 / 0.20) + postmortQuality * (0.10 / 0.20));
+
+  // Apply weights: 0.25, 0.25, 0.15, 0.20, 0.15
   const breakdown = {
-    diagnosis_accuracy: Math.round(diagnosis * 0.25),
-    fix_quality: Math.round(fixQuality * 0.25),
-    migration_correctness: Math.round(migration * 0.15),
-    research_depth: Math.round(researchDepth * 0.10),
-    postmortem_quality: Math.round(postmortQuality * 0.10),
+    correctness: Math.round(diagnosis * 0.25),
+    code_quality: Math.round(fixQuality * 0.25),
+    completeness: Math.round(migration * 0.15),
+    methodology: Math.round(methodologyRaw * 0.20),
     speed: Math.round(speed * 0.15),
     total: 0,
   };

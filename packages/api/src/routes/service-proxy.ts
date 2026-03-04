@@ -11,8 +11,8 @@
  *       → authenticated reverse proxy to the named MCP server container
  *
  *   GET /matches/:matchId/proxy/*
- *       → rate-limited proxy to docs.lighthouse.internal (and any other
- *         allowed domains declared in the challenge's ProxySpec)
+ *       → rate-limited proxy to allowed domains declared in the
+ *         challenge's ProxySpec (e.g., docs.lighthouse.internal)
  *
  * This approach:
  *   - Keeps containers on an internal Docker network (no public port exposure)
@@ -204,8 +204,7 @@ serviceProxyRoutes.all(
 
 // ── Documentation proxy ───────────────────────────────────────────────
 //
-// Serves docs content from docs.lighthouse.internal by forwarding to the
-// lighthouse-api container's /docs/* routes.
+// Forwards requests to allowed domains declared in the challenge's ProxySpec.
 // Rate-limited per the challenge's ProxySpec.rateLimit (default 30/min).
 
 serviceProxyRoutes.all(
@@ -220,18 +219,23 @@ serviceProxyRoutes.all(
       return errorEnvelope(c, "Match not found or not active", 404);
     }
 
-    // Find the lighthouse-api service (docs are served from it)
-    const lighthouseService = resolved.containerData.services.find(
-      (s) => s.name === "lighthouse-api",
-    );
-    if (!lighthouseService) {
-      return errorEnvelope(c, "No documentation service available for this challenge", 404);
-    }
-
-    // Look up rate limit from challenge's ProxySpec
+    // Look up challenge module and proxy config
     const mod = getChallenge(resolved.challengeSlug);
     const proxySpec = mod?.workspaceSpec?.proxy;
-    const rateLimit = proxySpec?.rateLimit ?? 30;
+    if (!proxySpec) {
+      return errorEnvelope(c, "No proxy configured for this challenge", 404);
+    }
+
+    // Find the backend service: explicit backendService, or first service
+    const backendServiceName = proxySpec.backendService ?? mod?.workspaceSpec?.services?.[0]?.name;
+    const backendService = resolved.containerData.services.find(
+      (s) => s.name === backendServiceName,
+    );
+    if (!backendService) {
+      return errorEnvelope(c, "No backend service available for proxy", 404);
+    }
+
+    const rateLimit = proxySpec.rateLimit ?? 30;
 
     if (!checkRateLimit(matchId, rateLimit)) {
       return errorEnvelope(
@@ -242,11 +246,12 @@ serviceProxyRoutes.all(
       );
     }
 
-    // Strip the /proxy prefix and forward to lighthouse-api's /docs/
+    // Strip the /proxy prefix and forward to backend service
     const url = new URL(c.req.url);
     const routePrefix = `/api/v1/matches/${matchId}/proxy`;
     const docPath = url.pathname.replace(routePrefix, "") || "/";
-    const forwardUrl = `${lighthouseService.internalUrl}/docs${docPath}${url.search}`;
+    const pathPrefix = proxySpec.backendPathPrefix ?? "/docs";
+    const forwardUrl = `${backendService.internalUrl}${pathPrefix}${docPath}${url.search}`;
 
     const headers = new Headers();
     headers.set("authorization", `Bearer ${resolved.containerData.serviceToken}`);

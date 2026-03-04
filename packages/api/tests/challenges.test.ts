@@ -139,7 +139,7 @@ describe("Deep Mapping scoring", () => {
       apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(600);
-    expect(r.breakdown.strategy).toBeGreaterThan(0);
+    expect(r.breakdown.speed).toBeGreaterThan(0);
   });
 
   it("score never exceeds 1000", () => {
@@ -301,8 +301,8 @@ describe("Logic Reef scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
-    expect(r.breakdown.reasoning).toBeGreaterThan(0);
-    expect(r.breakdown.coverage).toBeGreaterThan(0);
+    expect(r.breakdown.methodology).toBeGreaterThan(0);
+    expect(r.breakdown.completeness).toBeGreaterThan(0);
   });
 
   it("score never exceeds 1000", () => {
@@ -402,7 +402,7 @@ describe("Reef Refactor scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 30000), apiCallCount: 0,
     });
     expect(r.breakdown.correctness).toBe(0);
-    expect(r.breakdown.coverage).toBe(0);
+    expect(r.breakdown.completeness).toBe(0);
   });
 });
 
@@ -496,7 +496,7 @@ describe("Archive Dive scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
-    expect(r.breakdown.citations).toBeGreaterThan(0);
+    expect(r.breakdown.methodology).toBeGreaterThan(0);
   });
 
   it("score never exceeds 1000", () => {
@@ -857,7 +857,7 @@ describe("The Mirage scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
-    expect(r.breakdown.thoroughness).toBeGreaterThan(0);
+    expect(r.breakdown.completeness).toBeGreaterThan(0);
   });
 
   it("score never exceeds 1000", () => {
@@ -949,8 +949,8 @@ describe("Codebase Archaeology scoring", () => {
       submission: {}, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
     });
-    expect(r.breakdown.identification).toBe(0);
-    expect(r.breakdown.fix_quality).toBe(0);
+    expect(r.breakdown.correctness).toBe(0);
+    expect(r.breakdown.code_quality).toBe(0);
   });
 });
 
@@ -1005,7 +1005,7 @@ describe("Needle Haystack scoring", () => {
       submittedAt: new Date(startedAt.getTime() + 120000), apiCallCount: 0,
     });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(700);
-    expect(r.breakdown.citations).toBeGreaterThan(0);
+    expect(r.breakdown.analysis).toBeGreaterThan(0);
     expect(r.breakdown.completeness).toBeGreaterThan(0);
   });
 
@@ -1029,7 +1029,7 @@ describe("Needle Haystack scoring", () => {
       submission: { answers: [] }, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
     });
-    expect(r.breakdown.accuracy).toBe(0);
+    expect(r.breakdown.correctness).toBe(0);
     expect(r.breakdown.completeness).toBe(0);
   });
 });
@@ -1117,8 +1117,8 @@ describe("Performance Optimizer scoring", () => {
       submission: {}, groundTruth: gt as any, startedAt,
       submittedAt: new Date(startedAt.getTime() + 60000), apiCallCount: 0,
     });
-    expect(r.breakdown.optimization).toBe(0);
     expect(r.breakdown.correctness).toBe(0);
+    expect(r.breakdown.code_quality).toBe(0);
   });
 
   it("keyword stuffing without real logic is capped", () => {
@@ -1242,12 +1242,12 @@ if __name__ == '__main__':
     };
     const r = scoreLighthouse({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 3600000), apiCallCount: 50 });
     expect(r.breakdown.total).toBeGreaterThanOrEqual(850);
-    expect(r.breakdown.root_cause).toBeGreaterThan(150);
-    expect(r.breakdown.recovery).toBeGreaterThan(250);
-    expect(r.breakdown.failure_chain).toBeGreaterThan(100);
+    expect(r.breakdown.correctness).toBeGreaterThan(150);
+    expect(r.breakdown.completeness).toBeGreaterThan(250);
+    expect(r.breakdown.analysis).toBeGreaterThan(100);
   });
 
-  it("wrong root cause scores 0 on root_cause dimension", () => {
+  it("wrong root cause scores 0 on correctness dimension", () => {
     const wrongCauses = ["archive_disk_quota", "analysis_memory_leak", "preprocessing_config_drift", "results_store_index_corruption", "ingestion_cert_expiry"]
       .filter(c => c !== gt.rootCauseId);
     const sub = {
@@ -1259,10 +1259,10 @@ if __name__ == '__main__':
       methodology: "Checked logs.",
     };
     const r = scoreLighthouse({ submission: sub, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 100000), apiCallCount: 5 });
-    expect(r.breakdown.root_cause).toBeLessThan(80);
+    expect(r.breakdown.correctness).toBeLessThan(80);
   });
 
-  it("red herring in failure_chain loses points", () => {
+  it("red herring in failure chain loses analysis points", () => {
     const subWithRedHerring = {
       root_cause: gt.rootCauseId,
       failure_chain: [...gt.failureChain, gt.redHerring.subsystem],
@@ -1281,7 +1281,7 @@ if __name__ == '__main__':
     };
     const rWith = scoreLighthouse({ submission: subWithRedHerring, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 100000), apiCallCount: 10 });
     const rWithout = scoreLighthouse({ submission: subWithout, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 100000), apiCallCount: 10 });
-    expect(rWith.breakdown.failure_chain).toBeLessThan(rWithout.breakdown.failure_chain);
+    expect(rWith.breakdown.analysis).toBeLessThan(rWithout.breakdown.analysis);
   });
 
   it("empty submission scores 0", () => {
@@ -1296,7 +1296,7 @@ if __name__ == '__main__':
     const subReversed = { root_cause: gt.rootCauseId, failure_chain: gt.failureChain, recovery_actions_taken: reversedOrder, recovery_script: "def main(): pass\nmain()", incident_report: "short", methodology: "used runbook" };
     const rCorrect = scoreLighthouse({ submission: subCorrect, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 100000), apiCallCount: 20 });
     const rReversed = scoreLighthouse({ submission: subReversed, groundTruth: gt as any, startedAt, submittedAt: new Date(startedAt.getTime() + 100000), apiCallCount: 20 });
-    expect(rCorrect.breakdown.recovery).toBeGreaterThanOrEqual(rReversed.breakdown.recovery);
+    expect(rCorrect.breakdown.completeness).toBeGreaterThanOrEqual(rReversed.breakdown.completeness);
   });
 
   it("total score is always within 0–1000", () => {

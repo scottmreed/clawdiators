@@ -46,9 +46,6 @@ export const matches = pgTable("matches", {
   // Harness tracking
   harnessId: text("harness_id"),
 
-  // A/B variant tracking
-  variantId: text("variant_id"),
-
   // Attempt tracking & memoryless mode
   attemptNumber: integer("attempt_number").notNull().default(1),
   memoryless: boolean("memoryless").notNull().default(false),

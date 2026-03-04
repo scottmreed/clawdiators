@@ -23,6 +23,10 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { existsSync } from "node:fs";
+import { copyFile, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { ServiceSpec, McpServerSpec, WorkspaceSpec } from "@clawdiators/shared";
 
 const execFileAsync = promisify(execFile);
@@ -54,7 +58,11 @@ export interface MatchContainerData {
   serviceToken: string;
   launchedAt: string;
   /** Which backend launched these — needed to clean up correctly */
-  backend: "docker" | "fly";
+  backend: "docker" | "fly" | "compose";
+  /** Compose project name (only set for compose backend) */
+  composeProject?: string;
+  /** Temp dir containing the compose file copy (only set for compose backend) */
+  composeTmpDir?: string;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────
@@ -287,6 +295,113 @@ function parseMemoryToMb(mem: string): number {
   return n; // assume mb
 }
 
+// ── Backend: Docker Compose ──────────────────────────────────────────
+//
+// For PR-submitted challenges that include a docker-compose.yml.
+// Runs `docker compose up -d --build --wait` with injected env vars.
+//
+// How it works:
+//   1. Copy compose file to a temp dir (for project isolation)
+//   2. `docker compose -p clw-{shortId} up -d --build --wait`
+//   3. Resolve ports via `docker compose port`
+//   4. On cleanup: `docker compose -p clw-{shortId} down -v --remove-orphans`
+
+async function composeUp(
+  matchId: string,
+  seed: number,
+  challengeSlug: string,
+  composeFilePath: string,
+  ttlSecs?: number,
+): Promise<MatchContainerData> {
+  const project = `clw-${shortMatchId(matchId)}`;
+  const serviceToken = generateMatchToken();
+
+  // Copy compose file to temp dir for isolation
+  const tmpDir = await mkdtemp(join(tmpdir(), `clw-compose-`));
+  const tmpComposePath = join(tmpDir, "docker-compose.yml");
+  await copyFile(composeFilePath, tmpComposePath);
+
+  // Build env file
+  const envContent = [
+    `SEED=${seed}`,
+    `MATCH_ID=${matchId}`,
+    `SERVICE_TOKEN=${serviceToken}`,
+    ...(ttlSecs ? [`MATCH_TTL_SECS=${ttlSecs}`] : []),
+  ].join("\n");
+  await writeFile(join(tmpDir, ".env"), envContent);
+
+  // Start services
+  await execFileAsync("docker", [
+    "compose", "-p", project, "-f", tmpComposePath,
+    "up", "-d", "--build", "--wait",
+  ], {
+    timeout: 120_000,
+    env: { ...process.env, SEED: String(seed), MATCH_ID: matchId, SERVICE_TOKEN: serviceToken },
+  });
+
+  // List running services
+  const { stdout: psOutput } = await execFileAsync("docker", [
+    "compose", "-p", project, "-f", tmpComposePath,
+    "ps", "--format", "json",
+  ], { timeout: 10_000 });
+
+  // Parse service info — each line is a JSON object
+  const services: RunningService[] = [];
+  for (const line of psOutput.trim().split("\n").filter(Boolean)) {
+    try {
+      const svc = JSON.parse(line) as { Service: string; ID: string; Name: string; Ports?: string };
+      // Resolve the first published port
+      let internalUrl = `http://${svc.Name}:3000`; // default for in-Docker networking
+      let hostPort: number | undefined;
+
+      try {
+        const { stdout: portOutput } = await execFileAsync("docker", [
+          "compose", "-p", project, "-f", tmpComposePath,
+          "port", svc.Service, "3000",
+        ], { timeout: 5_000 });
+        const pm = portOutput.trim().match(/:(\d+)$/);
+        if (pm) {
+          hostPort = parseInt(pm[1], 10);
+          internalUrl = `http://localhost:${hostPort}`;
+        }
+      } catch {
+        // No published port — use container networking
+      }
+
+      services.push({
+        name: svc.Service,
+        containerId: svc.ID,
+        containerName: svc.Name,
+        internalUrl,
+        hostPort,
+      });
+    } catch {
+      // Skip malformed lines
+    }
+  }
+
+  return {
+    services,
+    mcpServers: [], // MCP servers from Compose are treated as regular services
+    serviceToken,
+    launchedAt: new Date().toISOString(),
+    backend: "compose",
+    composeProject: project,
+    composeTmpDir: tmpDir,
+  };
+}
+
+function composeDown(project: string, tmpDir?: string): void {
+  execFileAsync("docker", [
+    "compose", "-p", project, "down", "-v", "--remove-orphans",
+  ], { timeout: 30_000 }).catch(() => {});
+
+  // Clean up temp dir
+  if (tmpDir) {
+    rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────
 
 function getBackend(): "docker" | "fly" {
@@ -311,7 +426,17 @@ export async function launchMatchContainers(
   seed: number,
   workspaceSpec: Pick<WorkspaceSpec, "services" | "mcpServers">,
   ttlSecs?: number,
+  challengeSlug?: string,
 ): Promise<MatchContainerData> {
+  // Check if challenge directory has a docker-compose.yml (PR-submitted challenges)
+  if (challengeSlug) {
+    const challengeDir = join(import.meta.dirname, `../challenges/${challengeSlug}`);
+    const composePath = join(challengeDir, "docker-compose.yml");
+    if (existsSync(composePath)) {
+      return composeUp(matchId, seed, challengeSlug, composePath, ttlSecs);
+    }
+  }
+
   const backend = getBackend();
   const start: StartFn = backend === "fly" ? flyStart : dockerStart;
 
@@ -384,6 +509,11 @@ export async function launchMatchContainers(
  * Uses whichever backend originally launched them.
  */
 export function stopMatchContainers(data: MatchContainerData): void {
+  if (data.backend === "compose" && data.composeProject) {
+    composeDown(data.composeProject, data.composeTmpDir);
+    return;
+  }
+
   if (data.backend === "fly") {
     const ids = [
       ...data.services.map((s) => s.containerId),
