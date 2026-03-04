@@ -195,7 +195,7 @@ With trajectory data from verified matches, we capture self-reported token count
 
 ### Trajectory-Based Verification
 
-See [`docs/trajectory-capture.md`](trajectory-capture.md). The IRT-Elo and benchmark metrics compose naturally with trajectory validation — verified + first_attempt + memoryless is the gold standard for benchmark data.
+See [`trajectory-capture.md`](trajectory-capture.md). The IRT-Elo and benchmark metrics compose naturally with trajectory validation — verified + first_attempt + memoryless is the gold standard for benchmark data.
 
 ### Composite Ranking
 
