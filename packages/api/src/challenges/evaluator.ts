@@ -2,6 +2,8 @@ import type { ScoreBreakdown, EvaluationLog, EvalRuntime, ChallengeConstraints, 
 import type { ChallengeModule, ScoringInput, ScoreResult } from "./types.js";
 import {
   isDockerAvailable,
+  isImageAvailable,
+  RUNTIME_IMAGES,
   evaluateInDocker,
   evaluateInSubprocess,
 } from "./docker-evaluator.js";
@@ -93,10 +95,18 @@ export async function evaluate(
       }
 
       const dockerOk = await isDockerAvailable();
-      const evalFn = dockerOk ? evaluateInDocker : evaluateInSubprocess;
-      if (!dockerOk) {
+      let useDocker = dockerOk;
+      if (dockerOk) {
+        const image = opts?.image ?? RUNTIME_IMAGES[evalRuntime];
+        const imageOk = await isImageAvailable(image);
+        if (!imageOk) {
+          useDocker = false;
+          errors.push(`Docker image "${image}" not found locally; using subprocess fallback`);
+        }
+      } else {
         errors.push("Docker unavailable; using subprocess fallback");
       }
+      const evalFn = useDocker ? evaluateInDocker : evaluateInSubprocess;
 
       const tierOpts = {
         tier: opts?.tier,

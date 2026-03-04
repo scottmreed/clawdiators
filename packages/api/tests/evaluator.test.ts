@@ -226,6 +226,7 @@ describe("evaluate() with Docker (mocked)", () => {
   it("test-suite with Docker available: calls evaluateInDocker", async () => {
     const dockerMod = await import("../src/challenges/docker-evaluator.js");
     vi.spyOn(dockerMod, "isDockerAvailable").mockResolvedValue(true);
+    vi.spyOn(dockerMod, "isImageAvailable").mockResolvedValue(true);
     vi.spyOn(dockerMod, "evaluateInDocker").mockResolvedValue({
       scores: { accuracy: 500 },
       exitCode: 0,
@@ -252,6 +253,38 @@ describe("evaluate() with Docker (mocked)", () => {
     expect(log.method).toBe("test-suite");
     expect(log.errors).not.toContain("Docker unavailable; using subprocess fallback");
     expect(dockerMod.evaluateInDocker).toHaveBeenCalledOnce();
+  });
+
+  it("Docker available but image missing: falls back to subprocess", async () => {
+    const dockerMod = await import("../src/challenges/docker-evaluator.js");
+    vi.spyOn(dockerMod, "isDockerAvailable").mockResolvedValue(true);
+    vi.spyOn(dockerMod, "isImageAvailable").mockResolvedValue(false);
+    const subSpy = vi.spyOn(dockerMod, "evaluateInSubprocess").mockResolvedValue({
+      scores: { accuracy: 700, methodology: 100 },
+      exitCode: 0,
+      stdout: '{"scores":{"accuracy":700,"methodology":100}}',
+      stderr: "",
+    });
+
+    const mod = getChallenge("cipher-forge")!;
+    const input = makeScoringInput(mod, {});
+
+    const fakeMod: ChallengeModule = {
+      ...mod,
+      scoringSpec: {
+        method: "custom-script",
+        dimensions: mod.dimensions,
+        maxScore: 1000,
+        evaluator: 'console.log(JSON.stringify({scores:{accuracy:700,methodology:100}}))',
+        runtime: "node",
+      },
+    };
+
+    const { log } = await evaluate(fakeMod, input);
+
+    expect(log.errors.some((e) => e.includes("not found locally"))).toBe(true);
+    expect(dockerMod.evaluateInSubprocess).toHaveBeenCalledOnce();
+    expect(log.errors).not.toContain("Docker unavailable; using subprocess fallback");
   });
 
   it("evaluator returns no scores: falls back to mod.score()", async () => {
@@ -301,6 +334,7 @@ describe("evaluate() with tier parameters", () => {
   it("passes tier to Docker evaluator via opts", async () => {
     const dockerMod = await import("../src/challenges/docker-evaluator.js");
     vi.spyOn(dockerMod, "isDockerAvailable").mockResolvedValue(true);
+    vi.spyOn(dockerMod, "isImageAvailable").mockResolvedValue(true);
     const dockerSpy = vi.spyOn(dockerMod, "evaluateInDocker").mockResolvedValue({
       scores: { accuracy: 500, speed: 200 },
       exitCode: 0,
@@ -334,6 +368,7 @@ describe("evaluate() with tier parameters", () => {
   it("passes envVars to Docker evaluator", async () => {
     const dockerMod = await import("../src/challenges/docker-evaluator.js");
     vi.spyOn(dockerMod, "isDockerAvailable").mockResolvedValue(true);
+    vi.spyOn(dockerMod, "isImageAvailable").mockResolvedValue(true);
     const dockerSpy = vi.spyOn(dockerMod, "evaluateInDocker").mockResolvedValue({
       scores: { accuracy: 300 },
       exitCode: 0,

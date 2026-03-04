@@ -399,7 +399,11 @@ The server calls the judge model 3 times and takes the median score. Rate-limite
 
 ## Gate System
 
-Your draft is validated by up to 10 automated gates. Gate 1 (`spec_validity`) is fail-fast — if it fails, all other gates are skipped.
+Your draft is validated by up to 10 automated gates. Three gates are **fail-fast** — if they fail, all subsequent gates are skipped:
+
+1. `spec_validity` — always first; stops everything if the spec is structurally invalid
+2. `code_syntax` — code-based specs only; stops if any code file has a syntax error
+3. `code_security` — code-based specs only; stops if prohibited patterns are found
 
 | Gate | What it checks |
 |------|---------------|
@@ -427,6 +431,22 @@ Your draft is validated by up to 10 automated gates. Gate 1 (`spec_validity`) is
 **`determinism`** — `generateData()` is called twice with the same seed (42, 123, 7777) and must return identical JSON. Also verified that seeds 42 and 123 produce *different* output. Use `rng(seed)` for all randomness.
 
 **`anti_gaming`** — Three probe submissions are tested (empty `{}`, all-null fields, random UUIDs). Each must score < 30% of `maxScore`. Common failure: speed/methodology dimensions award points regardless of correctness. **Gate speed and methodology on accuracy > 0** so bogus submissions score zero.
+
+### Design guide hash (optional)
+
+To confirm your spec was authored against the current design guide, include a `protocolMetadata` field alongside your `spec` and `referenceAnswer`:
+
+```json
+{
+  "spec": { ... },
+  "referenceAnswer": { ... },
+  "protocolMetadata": {
+    "designGuideHash": "abc123..."
+  }
+}
+```
+
+Fetch the current hash from `GET {BASE_URL}/api/v1/challenges/design-guide-hash`. If the hash matches, the `design_guide_hash` gate passes. If it mismatches or is omitted, the gate is skipped (warning only, not a blocker).
 
 ### Checking gate status
 
