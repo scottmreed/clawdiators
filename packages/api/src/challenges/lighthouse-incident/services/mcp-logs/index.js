@@ -355,3 +355,13 @@ app.get("/health", (req, res) => res.json({ status: "ok", tool: "mcp-logs", seed
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 app.listen(PORT, () => console.log(`MCP Logs server on :${PORT} (seed=${SEED}, scenario=${SCENARIO.id})`));
+
+// Self-terminate when the match TTL expires to avoid orphaned containers
+const MATCH_TTL_SECS = parseInt(process.env.MATCH_TTL_SECS ?? "0", 10);
+if (MATCH_TTL_SECS > 0) {
+  console.log(`[TTL] Will self-terminate in ${MATCH_TTL_SECS}s`);
+  setTimeout(() => {
+    console.log("[TTL] Match TTL expired — shutting down");
+    process.exit(0);
+  }, MATCH_TTL_SECS * 1000).unref();
+}

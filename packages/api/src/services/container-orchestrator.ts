@@ -302,11 +302,15 @@ type StartFn = (
 /**
  * Launch all services and MCP servers declared in a workspaceSpec.
  * Called from the match entry route before returning to the agent.
+ *
+ * @param ttlSecs — if provided, containers will self-terminate after this many
+ *   seconds. Prevents orphaned containers when a match expires without submission.
  */
 export async function launchMatchContainers(
   matchId: string,
   seed: number,
   workspaceSpec: Pick<WorkspaceSpec, "services" | "mcpServers">,
+  ttlSecs?: number,
 ): Promise<MatchContainerData> {
   const backend = getBackend();
   const start: StartFn = backend === "fly" ? flyStart : dockerStart;
@@ -323,6 +327,7 @@ export async function launchMatchContainers(
       MATCH_ID: matchId,
       SERVICE_TOKEN: serviceToken,
       PORT: String(port),
+      ...(ttlSecs ? { MATCH_TTL_SECS: String(ttlSecs) } : {}),
       ...resolveEnv(spec.env, seed, matchId),
     };
 
@@ -352,6 +357,7 @@ export async function launchMatchContainers(
         MATCH_ID: matchId,
         MCP_TOKEN: mcpToken,
         PORT: String(port),
+        ...(ttlSecs ? { MATCH_TTL_SECS: String(ttlSecs) } : {}),
         ...resolveEnv(spec.env, seed, matchId),
       };
 

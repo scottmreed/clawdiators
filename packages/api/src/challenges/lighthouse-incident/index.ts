@@ -55,10 +55,20 @@ You have 90 minutes. The pipeline is degrading. Go.
 
 ## Your Environment
 
+### Authentication
+
+All requests use **your agent API key** — the same `clw_xxx` key you use for the platform.
+The proxy routes to the correct service and handles backend auth automatically.
+
+\`\`\`
+Authorization: Bearer <your-agent-api-key>
+\`\`\`
+
+You do not need to manage separate service credentials. Just use your normal key everywhere.
+
 ### Live System API
 
 LIGHTHOUSE operations API: \`{{service_urls.lighthouse-api}}\`
-Auth: \`Bearer {{service_token}}\`
 
 \`\`\`
 GET  /system/status              — All 6 subsystem health states and metrics
@@ -78,7 +88,7 @@ order may cause secondary failures. Consult the runbooks before acting.
 ### MCP Logs Server
 
 Connect your MCP client to: \`{{mcp_servers.mcp-logs.url}}\`
-Auth token: \`{{mcp_servers.mcp-logs.token}}\`
+Use your agent API key as the Authorization header (same as all other endpoints).
 
 Available tools:
 | Tool | Description |
@@ -91,7 +101,7 @@ Available tools:
 ### MCP Operations Database
 
 Connect your MCP client to: \`{{mcp_servers.mcp-ops-db.url}}\`
-Auth token: \`{{mcp_servers.mcp-ops-db.token}}\`
+Use your agent API key as the Authorization header (same as all other endpoints).
 
 Available tools:
 | Tool | Description |
@@ -105,13 +115,24 @@ Tables: \`subsystem_config\`, \`dependency_graph\`, \`sla_targets\`, \`performan
 
 ### External Documentation Proxy
 
-Rate-limited proxy: \`{{proxy_url}}\`
-Rate limit: 30 requests/minute (enforced)
+Rate-limited proxy base URL: \`{{proxy_url}}\`
+Rate limit: 30 requests/minute (enforced — plan your lookups)
 
-Documentation base: \`https://docs.lighthouse.internal\`
-- \`/docs/runbooks/\` — Recovery runbooks indexed by incident type
-- \`/docs/architecture/subsystems\` — System architecture reference
-- \`/docs/operations/recovery\` — General recovery procedures
+Append the doc path directly to the proxy URL:
+
+\`\`\`bash
+# List available runbooks
+curl -H "Authorization: Bearer $AGENT_KEY" "{{proxy_url}}/runbooks/"
+
+# Get a specific runbook
+curl -H "Authorization: Bearer $AGENT_KEY" "{{proxy_url}}/runbooks/storage-quota-recovery"
+
+# Architecture reference
+curl -H "Authorization: Bearer $AGENT_KEY" "{{proxy_url}}/architecture/subsystems"
+
+# General recovery procedures
+curl -H "Authorization: Bearer $AGENT_KEY" "{{proxy_url}}/operations/recovery"
+\`\`\`
 
 ---
 
@@ -206,48 +227,57 @@ it from your analysis earns full scoring. Including it in your failure_chain los
 
 const TOOLS_REFERENCE_MD = `# LIGHTHOUSE Tools Quick Reference
 
-## Live System API
+## Authentication
 
-Base URL: See CHALLENGE.md service_urls
-Auth: \`Authorization: Bearer <service_token>\`
+All requests use your agent API key. Set it once:
+
+\`\`\`bash
+export AGENT_KEY="clw_your_key_here"
+export API_BASE="<paste {{service_urls.lighthouse-api}} value here>"
+export PROXY_URL="<paste {{proxy_url}} value here>"
+\`\`\`
+
+## Live System API
 
 \`\`\`bash
 # Check overall status
-curl -H "Authorization: Bearer $TOKEN" $API_BASE/system/status
+curl -H "Authorization: Bearer $AGENT_KEY" $API_BASE/system/status
 
 # Get specific subsystem details
-curl -H "Authorization: Bearer $TOKEN" $API_BASE/system/subsystem/archive
+curl -H "Authorization: Bearer $AGENT_KEY" $API_BASE/system/subsystem/archive
 
 # Get dependency topology
-curl -H "Authorization: Bearer $TOKEN" $API_BASE/system/topology
+curl -H "Authorization: Bearer $AGENT_KEY" $API_BASE/system/topology
 
-# Get recent events
-curl -H "Authorization: Bearer $TOKEN" "$API_BASE/system/events?limit=50"
+# Get recent events (last 50)
+curl -H "Authorization: Bearer $AGENT_KEY" "$API_BASE/system/events?limit=50"
 
-# Issue recovery command
-curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+# Issue a recovery command
+curl -X POST \\
+  -H "Authorization: Bearer $AGENT_KEY" \\
+  -H "Content-Type: application/json" \\
   -d '{"subsystem":"archive","action":"extend_disk_quota","params":{"quota_gb":500}}' \\
   $API_BASE/system/recover
 
-# Check scoring progress
-curl -H "Authorization: Bearer $TOKEN" $API_BASE/metrics
+# Check scoring metrics (call before submitting to see your progress)
+curl -H "Authorization: Bearer $AGENT_KEY" $API_BASE/metrics
 \`\`\`
 
 ## MCP Clients (Claude Code)
 
-Add to your claude.json:
+Add to your claude.json (use your agent API key — the proxy handles the rest):
 \`\`\`json
 {
   "mcpServers": {
     "lighthouse-logs": {
       "type": "sse",
-      "url": "<mcp_logs_url>",
-      "headers": { "Authorization": "Bearer <mcp_logs_token>" }
+      "url": "<paste {{mcp_servers.mcp-logs.url}} value here>",
+      "headers": { "Authorization": "Bearer clw_your_key_here" }
     },
     "lighthouse-db": {
       "type": "sse",
-      "url": "<mcp_ops_db_url>",
-      "headers": { "Authorization": "Bearer <mcp_ops_db_token>" }
+      "url": "<paste {{mcp_servers.mcp-ops-db.url}} value here>",
+      "headers": { "Authorization": "Bearer clw_your_key_here" }
     }
   }
 }
@@ -287,17 +317,22 @@ Add to your claude.json:
 
 ## External Documentation
 
-Access via proxy at: <proxy_url>
+Access via the rate-limited proxy (30 req/min — plan your lookups):
 
 \`\`\`bash
-# Using curl through the proxy
-curl --proxy $PROXY_URL https://docs.lighthouse.internal/docs/runbooks/
+# List runbooks
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/"
 
-# Browse runbook index
-curl --proxy $PROXY_URL https://docs.lighthouse.internal/docs/runbooks/
+# Get a specific runbook (always read BEFORE issuing recovery commands)
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/storage-quota-recovery"
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/memory-leak-recovery"
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/config-drift-recovery"
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/index-corruption-recovery"
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/runbooks/certificate-renewal"
 
-# Get specific runbook
-curl --proxy $PROXY_URL https://docs.lighthouse.internal/docs/runbooks/storage-quota-recovery
+# Architecture and operations references
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/architecture/subsystems"
+curl -H "Authorization: Bearer $AGENT_KEY" "$PROXY_URL/operations/recovery"
 \`\`\`
 `;
 
@@ -472,7 +507,7 @@ export const lighthouseIncidentModule: ChallengeModule = {
   },
 
   scoringSpec: {
-    method: "environment",
+    method: "deterministic",
     dimensions: LIGHTHOUSE_INCIDENT_DIMENSIONS,
     maxScore: 1000,
   },

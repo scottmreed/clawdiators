@@ -173,12 +173,18 @@ serviceProxyRoutes.all(
     // Inject the MCP server's auth token so agents don't need separate credentials
     headers.set("authorization", `Bearer ${mcpServer.token}`);
 
+    // SSE connections persist for the entire match duration (up to 90 min).
+    // Use a 3-hour timeout so we never kill a live MCP session mid-operation.
+    // Regular tool-call requests complete in well under 30 seconds.
+    const isSSE = (c.req.header("accept") ?? "").includes("text/event-stream");
+    const mcpTimeoutMs = isSSE ? 3 * 60 * 60 * 1000 : 30_000;
+
     try {
       const upstream = await fetch(forwardUrl, {
         method: c.req.method,
         headers,
         body: ["GET", "HEAD"].includes(c.req.method) ? undefined : c.req.raw.body,
-        signal: AbortSignal.timeout(60_000), // MCP SSE connections can be long
+        signal: AbortSignal.timeout(mcpTimeoutMs),
         // @ts-ignore
         duplex: "half",
       });

@@ -78,9 +78,30 @@ interface RecoveryAction {
   result?: string;
 }
 
+interface LighthouseMetrics {
+  recovery_completeness?: number;
+  out_of_order_penalty?: number;
+  scoring_summary?: {
+    action_completion_rate?: number;
+    chain_resolved?: boolean;
+    fully_resolved?: boolean;
+  };
+}
+
+/**
+ * Score recovery dimension.
+ *
+ * When live service metrics are available (lighthouse-api /metrics), we blend:
+ *   60% — actual recovery state observed by the service (ground truth)
+ *   40% — self-reported actions quality (agent's submission)
+ *
+ * Without metrics (local dev, metrics fetch failed) falls back to 100%
+ * self-reported scoring so local testing still works correctly.
+ */
 function scoreRecovery(
   submission: Record<string, unknown>,
   gt: LighthouseGroundTruth,
+  liveMetrics?: LighthouseMetrics,
 ): number {
   const actions = submission.recovery_actions_taken;
   if (!Array.isArray(actions) || actions.length === 0) {
@@ -129,7 +150,22 @@ function scoreRecovery(
   // Bonus if they recovered subsystems in correct dependency order
   const correctOrderBonus = verifyRecoveryOrder(submitted, expected, gt.failureChain) ? 1.1 : 1.0;
 
-  return Math.min(1000, Math.round(totalScore * correctOrderBonus));
+  const selfReportedScore = Math.min(1000, Math.round(totalScore * correctOrderBonus));
+
+  // Blend with live service metrics when available.
+  // The service tracks actual completed actions server-side, making it
+  // much harder to game by fabricating recovery_actions_taken in the submission.
+  if (liveMetrics) {
+    const completeness = liveMetrics.recovery_completeness ?? 0;
+    const actionRate = liveMetrics.scoring_summary?.action_completion_rate ?? 0;
+    const oooP = liveMetrics.out_of_order_penalty ?? 1;
+    // Live score: how much of the failure chain was actually resolved, adjusted
+    // for out-of-order penalty (issuing actions in wrong order degrades recovery)
+    const liveScore = Math.round(Math.min(1, completeness * 0.7 + actionRate * 0.3) * oooP * 1000);
+    return Math.round(liveScore * 0.6 + selfReportedScore * 0.4);
+  }
+
+  return selfReportedScore;
 }
 
 function verifyRecoveryOrder(
@@ -321,8 +357,11 @@ export function scoreLighthouse(input: ScoringInput): ScoreResult {
   const gt = input.groundTruth as unknown as LighthouseGroundTruth;
   const sub = input.submission;
 
-  const rootCauseRaw = scoreRootCause(sub, gt);           // 0-1000
-  const recoveryRaw = scoreRecovery(sub, gt);              // 0-1000
+  // Extract live metrics from the lighthouse-api service (if fetched at submit time)
+  const liveMetrics = input.serviceMetrics?.["lighthouse-api"] as LighthouseMetrics | undefined;
+
+  const rootCauseRaw = scoreRootCause(sub, gt);                    // 0-1000
+  const recoveryRaw = scoreRecovery(sub, gt, liveMetrics);          // 0-1000
   const failureChainRaw = scoreFailureChain(sub, gt);      // 0-1000
   const recoveryScriptRaw = scoreRecoveryScript(sub, gt);  // 0-1000
   const researchRaw = scoreResearchBreadth(sub, gt);       // 0-1000

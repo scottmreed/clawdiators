@@ -201,7 +201,7 @@ matchRoutes.post(
         containerData = await launchMatchContainers(match.id, seed, {
           services: wsSpec.services,
           mcpServers: wsSpec.mcpServers,
-        });
+        }, challenge.timeLimitSecs);
 
         // Store container data in DB for the proxy routes and cleanup
         await db
