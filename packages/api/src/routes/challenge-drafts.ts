@@ -323,6 +323,86 @@ challengeDraftRoutes.post("/:id/resubmit-gates", async (c) => {
   );
 });
 
+// ── PUT /challenges/drafts/:id — update spec before gates pass ────────
+
+challengeDraftRoutes.put("/:id", async (c) => {
+  const agent = c.get("agent");
+  const id = c.req.param("id");
+
+  const draft = await db.query.challengeDrafts.findFirst({
+    where: eq(challengeDrafts.id, id),
+  });
+
+  if (!draft || draft.authorAgentId !== agent.id) {
+    return errorEnvelope(c, "Draft not found", 404, "No such blueprint exists.");
+  }
+
+  if (draft.gateStatus === "passed") {
+    return errorEnvelope(
+      c,
+      "Cannot update a draft whose gates have passed — use resubmit-gates to restart gate validation",
+      409,
+      "This blueprint has already cleared the gates.",
+    );
+  }
+
+  if (draft.status === "approved") {
+    return errorEnvelope(c, "Cannot update an approved draft", 409, "Approved blueprints are sealed.");
+  }
+
+  const body = await c.req.json() as { spec: unknown };
+
+  if (!body.spec) {
+    return errorEnvelope(c, "spec is required", 400);
+  }
+
+  // Fast-fail sync spec validation before saving
+  const validation = validateSpec(body.spec);
+  if (!validation.valid) {
+    return errorEnvelope(
+      c,
+      `Invalid challenge spec: ${validation.errors.join("; ")}`,
+      400,
+      "Your blueprint has flaws, gladiator.",
+    );
+  }
+
+  await db
+    .update(challengeDrafts)
+    .set({ spec: body.spec as Record<string, unknown> })
+    .where(eq(challengeDrafts.id, id));
+
+  return envelope(
+    c,
+    { id, updated: true },
+    200,
+    "Blueprint updated. Run resubmit-gates to re-validate.",
+  );
+});
+
+// ── DELETE /challenges/drafts/:id — delete a draft ────────────────────
+
+challengeDraftRoutes.delete("/:id", async (c) => {
+  const agent = c.get("agent");
+  const id = c.req.param("id");
+
+  const draft = await db.query.challengeDrafts.findFirst({
+    where: eq(challengeDrafts.id, id),
+  });
+
+  if (!draft || draft.authorAgentId !== agent.id) {
+    return errorEnvelope(c, "Draft not found", 404, "No such blueprint exists.");
+  }
+
+  if (draft.status === "approved") {
+    return errorEnvelope(c, "Cannot delete an approved draft", 409, "Approved blueprints are sealed.");
+  }
+
+  await db.delete(challengeDrafts).where(eq(challengeDrafts.id, id));
+
+  return envelope(c, { id, deleted: true }, 200, "Blueprint withdrawn from the arena.");
+});
+
 // ── POST /challenges/drafts/:id/review ───────────────────────────────
 
 challengeDraftRoutes.post("/:id/review", async (c) => {

@@ -391,12 +391,40 @@ async function main() {
     })
     .onConflictDoNothing();
 
+  // ── 16. Neural Speedrun (coding, legendary, workspace) ──────────────
+  await db
+    .insert(challenges)
+    .values({
+      slug: "neural-speedrun",
+      name: "Neural Speedrun",
+      description:
+        "A naive JavaScript MLP trainer runs for 10 seconds. Optimize it to maximize iterations per second without breaking correctness. Scored by actual runtime speedup.",
+      lore: "ClawLabs runs on throughput. The research team needs faster gradient descent — not theoretically faster, actually faster. They handed you the worst implementation they could find: no batching, no typed arrays, just raw JavaScript loops doing expensive floating point math one sample at a time. The record is 18x speedup. Beat it.",
+      category: "coding",
+      difficulty: "legendary",
+      matchType: "single",
+      timeLimitSecs: 1800,
+      maxScore: 1000,
+      scoringDimensions: [
+        { key: "speedup", label: "Speedup", weight: 0.8, description: "Steps ratio vs baseline (20x = max 800pts)", color: "emerald" },
+        { key: "loss_improvement", label: "Loss Quality", weight: 0.2, description: "MSE \u2264 1.05\u00d7 baseline = full 200pts", color: "gold" },
+      ],
+      sandboxApis: [],
+      config: {},
+      active: true,
+      workspaceType: "generator",
+      submissionType: "json",
+      scoringMethod: "deterministic",
+    })
+    .onConflictDoNothing();
+
   // ── Deactivate retired challenges ──────────────────────────────────
   const activeSlugs = [
     "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
     "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
     "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
     "codebase-archaeology", "needle-haystack", "performance-optimizer",
+    "neural-speedrun",
   ];
 
   const deactivated = await db
@@ -442,7 +470,7 @@ async function main() {
       lore: "There are no shortcuts in the Full Clawloseum. Every challenge, every category, every difficulty. Only the most versatile agents earn the right to call themselves complete.",
       challengeSlugs: activeSlugs,
       scoringMethod: "sum",
-      maxScore: 15000,
+      maxScore: 16000,
     })
     .onConflictDoNothing();
 

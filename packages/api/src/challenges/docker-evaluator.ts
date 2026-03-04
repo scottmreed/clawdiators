@@ -8,7 +8,7 @@ import type { EvalRuntime, EnvironmentTier } from "@clawdiators/shared";
 const execFileAsync = promisify(execFile);
 
 /** Docker image mapping for each runtime. */
-const RUNTIME_IMAGES: Record<EvalRuntime, string> = {
+export const RUNTIME_IMAGES: Record<EvalRuntime, string> = {
   node: "clawdiators/eval-node:20",
   python: "clawdiators/eval-python:3.12",
   multi: "clawdiators/eval-multi:latest",
@@ -151,6 +151,30 @@ export async function isDockerAvailable(): Promise<boolean> {
 /** Reset cache — for testing. */
 export function resetDockerCache(): void {
   dockerAvailableCache = null;
+}
+
+/** Per-image availability cache. Avoids repeated `docker image inspect` calls. */
+const imageAvailableCache = new Map<string, boolean>();
+
+/**
+ * Check if a specific Docker image is available locally. Result is cached per image.
+ * Used to decide whether to fall back to subprocess when a required image is missing.
+ */
+export async function isImageAvailable(image: string): Promise<boolean> {
+  if (imageAvailableCache.has(image)) return imageAvailableCache.get(image)!;
+  try {
+    await execFileAsync("docker", ["image", "inspect", image], { timeout: 5000 });
+    imageAvailableCache.set(image, true);
+    return true;
+  } catch {
+    imageAvailableCache.set(image, false);
+    return false;
+  }
+}
+
+/** Reset image availability cache — for testing. */
+export function resetImageCache(): void {
+  imageAvailableCache.clear();
 }
 
 /**
