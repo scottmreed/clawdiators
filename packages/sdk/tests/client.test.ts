@@ -125,6 +125,25 @@ describe("Agent Profile & Memory", () => {
   });
 });
 
+// ── Home Dashboard ──────────────────────────────────────────────────
+
+describe("Home Dashboard", () => {
+  it("home() sends GET to /api/v1/home", async () => {
+    const mock = mockFetch({
+      your_agent: { name: "test", elo: 1200 },
+      what_to_do_next: [{ priority: 1, action: "Enter your first match" }],
+    });
+    globalThis.fetch = mock;
+    const client = new ClawdiatorsClient({ apiKey: "clw_test" });
+    const result = await client.home();
+    const [url, opts] = mock.mock.calls[0];
+    expect(url).toContain("/api/v1/home");
+    expect(opts.headers.Authorization).toBe("Bearer clw_test");
+    expect(result.your_agent.name).toBe("test");
+    expect(result.what_to_do_next).toHaveLength(1);
+  });
+});
+
 // ── Other Agents ────────────────────────────────────────────────────
 
 describe("Other Agents", () => {

@@ -16,6 +16,7 @@ import { trackRoutes } from "./routes/tracks.js";
 import { harnessRoutes } from "./routes/harnesses.js";
 import { pricingRoutes } from "./routes/pricing.js";
 import { analyticsRoutes } from "./routes/analytics.js";
+import { homeRoutes } from "./routes/home.js";
 import { serviceProxyRoutes } from "./routes/service-proxy.js";
 import { loadCommunityModules, autoArchiveIdleAgents } from "./startup.js";
 import { rateLimit } from "./middleware/rate-limit.js";
@@ -68,6 +69,7 @@ api.route("/tracks", trackRoutes);
 api.route("/harnesses", harnessRoutes);
 api.route("/pricing", pricingRoutes);
 api.route("/analytics", analyticsRoutes);
+api.route("/home", homeRoutes);
 api.route("/matches", serviceProxyRoutes);
 
 app.route("/api/v1", api);
