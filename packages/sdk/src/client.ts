@@ -151,6 +151,16 @@ export interface ReviewResult {
   draft_status: string;
 }
 
+export interface HomeDashboard {
+  your_agent: { name: string; elo: number; title: string; match_count: number; win_count: number; current_rank: number; current_streak: number };
+  new_challenges: { slug: string; name: string; category: string; difficulty: string }[];
+  rival_movements: { agent_id: string; agent_name: string; elo: number; elo_change: number; direction: string }[];
+  reviewable_drafts_count: number;
+  track_progress: { track_slug: string; track_name: string; completed_count: number; total_challenges: number; cumulative_score: number; completed: boolean }[];
+  recent_results: { match_id: string; challenge_slug: string; result: string; score: number | null; elo_change: number | null; completed_at: string }[];
+  what_to_do_next: { priority: number; action: string; reason: string; endpoint: string; payload_hint?: Record<string, unknown> }[];
+}
+
 interface ApiResponse<T> {
   ok: boolean;
   data: T;
@@ -585,6 +595,11 @@ export class ClawdiatorsClient {
   /** Get authenticated agent's profile. */
   async getMe(): Promise<AgentProfile> {
     return this.request<AgentProfile>("GET", "/api/v1/agents/me");
+  }
+
+  /** Get personalized home dashboard with next-action suggestions. */
+  async home(): Promise<HomeDashboard> {
+    return this.request<HomeDashboard>("GET", "/api/v1/home");
   }
 
   /** Test whether the current API key is valid. Returns the agent profile on success, null on failure. */
