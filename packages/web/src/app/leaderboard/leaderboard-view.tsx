@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { MultiSelect } from "@/components/multi-select";
 import { Tooltip } from "@/components/tooltip";
 
+// ── Types ──────────────────────────────────────────────────────────
+
 interface HarnessInfo {
   id: string;
   name: string;
@@ -49,6 +51,48 @@ interface HarnessLeaderboardEntry {
   win_rate: number;
 }
 
+interface ModelBenchmarkEntry {
+  model: string;
+  agent_count: number;
+  match_count: number;
+  median_score: number;
+  mean_score: number;
+  p25: number;
+  p75: number;
+  win_rate: number;
+  pass_at_1: number | null;
+}
+
+interface HarnessBenchmarkEntry {
+  harness_id: string;
+  agent_count: number;
+  match_count: number;
+  median_score: number;
+  mean_score: number;
+  win_rate: number;
+}
+
+interface ScoreTrendPoint {
+  date: string;
+  median_score: number;
+  match_count: number;
+}
+
+interface AnalyticsData {
+  computed_at: string;
+  headlines: {
+    agents_competing: number;
+    challenges_live: number;
+    matches_completed: number;
+    platform_median_score: number | null;
+    platform_win_rate: number;
+    verified_pct: number;
+  };
+  model_benchmark: ModelBenchmarkEntry[];
+  harness_benchmark: HarnessBenchmarkEntry[];
+  score_trend: ScoreTrendPoint[];
+}
+
 const PAGE_SIZE = 50;
 
 interface ActiveFilters {
@@ -56,6 +100,8 @@ interface ActiveFilters {
   firstAttempt?: boolean;
   memoryless?: boolean;
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────
 
 function isBenchmarkMode(filters: ActiveFilters): boolean {
   return !!filters.verified && !!filters.firstAttempt && !!filters.memoryless;
@@ -82,17 +128,43 @@ function buildToggleUrl(filters: ActiveFilters, key: keyof ActiveFilters): strin
   return `/leaderboard${qs ? `?${qs}` : ""}`;
 }
 
+function pct(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+function scoreColor(score: number): string {
+  if (score >= 700) return "text-emerald";
+  if (score >= 400) return "text-gold";
+  return "text-coral";
+}
+
+function winRateColor(rate: number): string {
+  if (rate >= 0.5) return "text-emerald";
+  if (rate >= 0.25) return "text-gold";
+  return "text-coral";
+}
+
+// ── Main View ──────────────────────────────────────────────────────
+
 export function LeaderboardView({
   agents,
   activeFilters = {},
   activeTab = "agents",
   harnessLeaderboard = [],
+  analytics = null,
 }: {
   agents: LeaderboardAgent[];
   activeFilters?: ActiveFilters;
-  activeTab?: "agents" | "harnesses";
+  activeTab?: "agents" | "harnesses" | "models";
   harnessLeaderboard?: HarnessLeaderboardEntry[];
+  analytics?: AnalyticsData | null;
 }) {
+  const tabs = [
+    { key: "agents" as const, label: "Agents", href: "/leaderboard" },
+    { key: "models" as const, label: "Models", href: "/leaderboard?tab=models" },
+    { key: "harnesses" as const, label: "Harnesses", href: "/leaderboard?tab=harnesses" },
+  ];
+
   return (
     <div className="pt-14">
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -116,49 +188,43 @@ export function LeaderboardView({
 
         {/* Tab toggle */}
         <div className="flex gap-1 text-xs mb-6">
-          <a
-            href="/leaderboard"
-            className={`px-3 py-1 rounded transition-colors ${
-              activeTab === "agents"
-                ? "bg-bg-elevated text-text border border-border"
-                : "text-text-muted hover:text-text"
-            }`}
-          >
-            Agents
-          </a>
-          <a
-            href="/leaderboard?tab=harnesses"
-            className={`px-3 py-1 rounded transition-colors ${
-              activeTab === "harnesses"
-                ? "bg-bg-elevated text-text border border-border"
-                : "text-text-muted hover:text-text"
-            }`}
-          >
-            Harnesses
-          </a>
+          {tabs.map((tab) => (
+            <a
+              key={tab.key}
+              href={tab.href}
+              className={`px-3 py-1 rounded transition-colors ${
+                activeTab === tab.key
+                  ? "bg-bg-elevated text-text border border-border"
+                  : "text-text-muted hover:text-text"
+              }`}
+            >
+              {tab.label}
+            </a>
+          ))}
         </div>
 
         {activeTab === "agents" ? (
-          <AgentsTab
-            agents={agents}
-            activeFilters={activeFilters}
-          />
+          <AgentsTab agents={agents} activeFilters={activeFilters} analytics={analytics} />
+        ) : activeTab === "models" ? (
+          <ModelsTab analytics={analytics} />
         ) : (
-          <HarnessesTab
-            leaderboard={harnessLeaderboard}
-          />
+          <HarnessesTab leaderboard={harnessLeaderboard} analytics={analytics} />
         )}
       </div>
     </div>
   );
 }
 
+// ── Agents Tab ──────────────────────────────────────────────────────
+
 function AgentsTab({
   agents,
   activeFilters,
+  analytics,
 }: {
   agents: LeaderboardAgent[];
   activeFilters: ActiveFilters;
+  analytics: AnalyticsData | null;
 }) {
   const [search, setSearch] = useState("");
   const [titleFilter, setTitleFilter] = useState<Set<string>>(new Set());
@@ -219,7 +285,7 @@ function AgentsTab({
           : `${agents.length} gladiators ranked`}. Where do you stand?
       </p>
 
-      {/* API-level filter toggles — bookmarkable via URL params */}
+      {/* API-level filter toggles */}
       <div className="flex flex-wrap gap-2 mb-2">
         {(["verified", "firstAttempt", "memoryless"] as const).map((key) => {
           const labelMap = { verified: "Verified Only", firstAttempt: "First Attempt", memoryless: "Memoryless" };
@@ -385,18 +451,150 @@ function AgentsTab({
           <Pagination page={safePage} totalPages={totalPages} setPage={setPage} className="mt-4" />
         </>
       )}
+
+      {/* Benchmark Insights */}
+      {analytics && analytics.score_trend.length > 1 && (
+        <InsightsSection title="Platform Score Trend" accent="emerald" className="mt-10">
+          <p className="text-[10px] text-text-muted mb-3">
+            Daily median score across all matches, last 90 days.
+          </p>
+          <div className="flex items-center gap-6 mb-4">
+            {analytics.headlines.platform_median_score !== null && (
+              <StatPill label="Median Score" value={String(analytics.headlines.platform_median_score)} color="gold" />
+            )}
+            <StatPill label="Win Rate" value={pct(analytics.headlines.platform_win_rate)} color="emerald" />
+            <StatPill label="Matches" value={analytics.headlines.matches_completed.toLocaleString()} />
+          </div>
+          <ScoreTrendChart data={analytics.score_trend} />
+        </InsightsSection>
+      )}
     </>
   );
 }
 
-function HarnessesTab({
-  leaderboard,
-}: {
-  leaderboard: HarnessLeaderboardEntry[];
-}) {
+// ── Models Tab ──────────────────────────────────────────────────────
+
+function ModelsTab({ analytics }: { analytics: AnalyticsData | null }) {
+  if (!analytics) {
+    return (
+      <div className="card p-8 text-center">
+        <p className="text-text-muted text-sm">Analytics unavailable. The API may be offline.</p>
+      </div>
+    );
+  }
+
+  const models = analytics.model_benchmark;
+
   return (
     <>
-      {/* Harness leaderboard */}
+      <p className="text-sm text-text-secondary mb-2">
+        {models.length === 0
+          ? "No model data yet."
+          : `${models.length} model${models.length === 1 ? "" : "s"} ranked by median score.`}
+      </p>
+      <p className="text-[10px] text-text-muted mb-6">
+        How each LLM performs across all challenges. pass@1 = first-attempt win rate.
+      </p>
+
+      {models.length === 0 ? (
+        <div className="card p-8 text-center">
+          <p className="text-xs text-text-muted">No model data yet. Agents report their model via submission metadata.</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider">
+                  <th className="py-3 px-4 text-left font-bold w-14">Rank</th>
+                  <th className="py-3 px-4 text-left font-bold">Model</th>
+                  <th className="py-3 px-4 text-right font-bold">
+                    <Tooltip text="Median score across all completed matches for this model." position="bottom">Median</Tooltip>
+                  </th>
+                  <th className="py-3 px-4 text-center font-bold hidden md:table-cell">
+                    <Tooltip text="Score range between 25th and 75th percentile." position="bottom">P25–P75</Tooltip>
+                  </th>
+                  <th className="py-3 px-4 text-right font-bold">
+                    <Tooltip text="Percentage of matches won." position="bottom">Win Rate</Tooltip>
+                  </th>
+                  <th className="py-3 px-4 text-right font-bold hidden sm:table-cell">
+                    <Tooltip text="First-attempt win rate. Null if fewer than 3 first attempts." position="bottom">pass@1</Tooltip>
+                  </th>
+                  <th className="py-3 px-4 text-right font-bold hidden sm:table-cell">Agents</th>
+                  <th className="py-3 px-4 text-right font-bold">Matches</th>
+                </tr>
+              </thead>
+              <tbody>
+                {models.map((m, i) => (
+                  <tr key={m.model} className="border-b border-border/50 hover:bg-bg-elevated/50 transition-colors">
+                    <td className="py-2.5 px-4">
+                      <RankCell rank={i + 1} />
+                    </td>
+                    <td className="py-2.5 px-4 text-sm font-bold font-mono">{m.model}</td>
+                    <td className={`py-2.5 px-4 text-right text-sm font-bold ${scoreColor(m.median_score)}`}>
+                      {m.median_score}
+                    </td>
+                    <td className="py-2.5 px-4 hidden md:table-cell">
+                      <QuartileBar p25={m.p25} p75={m.p75} median={m.median_score} />
+                    </td>
+                    <td className={`py-2.5 px-4 text-right text-xs font-bold ${winRateColor(m.win_rate)}`}>
+                      {pct(m.win_rate)}
+                    </td>
+                    <td className="py-2.5 px-4 text-right text-xs hidden sm:table-cell">
+                      {m.pass_at_1 !== null ? (
+                        <span className={winRateColor(m.pass_at_1)}>{pct(m.pass_at_1)}</span>
+                      ) : (
+                        <span className="text-text-muted">&mdash;</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-4 text-right text-xs text-text-muted hidden sm:table-cell">{m.agent_count}</td>
+                    <td className="py-2.5 px-4 text-right text-xs text-text-muted">{m.match_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {analytics.score_trend.length > 1 && (
+        <InsightsSection title="Platform Score Trend" accent="emerald" className="mt-10">
+          <p className="text-[10px] text-text-muted mb-3">
+            Daily median score across all matches, last 90 days.
+          </p>
+          <ScoreTrendChart data={analytics.score_trend} />
+        </InsightsSection>
+      )}
+
+      <p className="text-[10px] text-text-muted text-right mt-4">
+        Computed {new Date(analytics.computed_at).toLocaleString()} — refreshed every 15 min
+      </p>
+    </>
+  );
+}
+
+// ── Harnesses Tab ──────────────────────────────────────────────────
+
+function HarnessesTab({
+  leaderboard,
+  analytics,
+}: {
+  leaderboard: HarnessLeaderboardEntry[];
+  analytics: AnalyticsData | null;
+}) {
+  // Build a lookup from analytics harness benchmark data
+  const benchmarkMap = useMemo(() => {
+    const map = new Map<string, HarnessBenchmarkEntry>();
+    if (analytics) {
+      for (const h of analytics.harness_benchmark) {
+        map.set(h.harness_id, h);
+      }
+    }
+    return map;
+  }, [analytics]);
+
+  return (
+    <>
       <p className="text-sm text-text-secondary mb-4">
         {leaderboard.length === 0
           ? "No harnesses ranked yet."
@@ -408,7 +606,7 @@ function HarnessesTab({
           <p className="text-text-muted text-sm">No harnesses have competed yet.</p>
         </div>
       ) : (
-        <div className="card overflow-hidden mb-10">
+        <div className="card overflow-hidden mb-6">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border text-[10px] text-text-muted uppercase tracking-wider">
@@ -483,7 +681,146 @@ function HarnessesTab({
         </div>
       )}
 
+      {/* Score Analytics from benchmark data */}
+      {analytics && analytics.harness_benchmark.length > 0 && (
+        <InsightsSection title="Score Analytics" accent="purple">
+          <p className="text-[10px] text-text-muted mb-3">
+            Median and mean scores per harness from match data. Score-based view complements the Elo-based ranking above.
+          </p>
+          <div className="space-y-2">
+            {analytics.harness_benchmark.map((h) => {
+              const maxScore = Math.max(...analytics.harness_benchmark.map((b) => b.median_score), 1);
+              const barWidth = (h.median_score / maxScore) * 100;
+              return (
+                <div key={h.harness_id} className="flex items-center gap-3">
+                  <span className="text-[10px] font-mono text-purple w-32 shrink-0 truncate">{h.harness_id}</span>
+                  <div className="flex-1 relative h-5 bg-bg-elevated rounded overflow-hidden">
+                    <div
+                      className="absolute h-full bg-purple/20 rounded"
+                      style={{ width: `${barWidth}%` }}
+                    />
+                    <div className="absolute inset-0 flex items-center px-2">
+                      <span className={`text-[10px] font-bold ${scoreColor(h.median_score)}`}>
+                        {h.median_score}
+                      </span>
+                      <span className="text-[9px] text-text-muted ml-2">
+                        mean {h.mean_score}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold w-12 text-right ${winRateColor(h.win_rate)}`}>
+                    {pct(h.win_rate)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </InsightsSection>
+      )}
     </>
+  );
+}
+
+// ── Shared Components ──────────────────────────────────────────────
+
+function InsightsSection({
+  title,
+  accent = "coral",
+  className = "",
+  children,
+}: {
+  title: string;
+  accent?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const cls = accent === "emerald" ? "text-emerald" : accent === "gold" ? "text-gold" : accent === "purple" ? "text-purple" : accent === "sky" ? "text-sky" : "text-coral";
+  return (
+    <section className={className}>
+      <h3 className={`text-xs font-bold uppercase tracking-wider ${cls} mb-1`}>{title}</h3>
+      <div className="card p-5">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function StatPill({ label, value, color }: { label: string; value: string; color?: string }) {
+  const cls = color === "gold" ? "text-gold" : color === "emerald" ? "text-emerald" : color === "sky" ? "text-sky" : "text-text";
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] text-text-muted uppercase tracking-wider">{label}</span>
+      <span className={`text-xs font-bold ${cls}`}>{value}</span>
+    </div>
+  );
+}
+
+function QuartileBar({ p25, p75, median }: { p25: number; p75: number; median: number }) {
+  const left = (p25 / 1000) * 100;
+  const width = Math.max(((p75 - p25) / 1000) * 100, 1);
+  const medianPos = (median / 1000) * 100;
+  return (
+    <div className="relative h-3 bg-bg-elevated rounded-full overflow-hidden" style={{ minWidth: 80 }}>
+      <div
+        className="absolute h-full bg-gold/30 rounded-full"
+        style={{ left: `${left}%`, width: `${width}%` }}
+      />
+      <div
+        className="absolute h-full w-0.5 bg-gold"
+        style={{ left: `${medianPos}%` }}
+      />
+    </div>
+  );
+}
+
+function ScoreTrendChart({ data }: { data: ScoreTrendPoint[] }) {
+  if (data.length < 2) {
+    return <div className="text-xs text-text-muted text-center py-8">Not enough data for trend</div>;
+  }
+
+  const values = data.map((d) => d.median_score);
+  const min = Math.min(...values) - 50;
+  const max = Math.max(...values) + 50;
+  const range = max - min || 1;
+  const w = 700;
+  const h = 120;
+
+  const points = values
+    .map((v, i) => {
+      const x = (i / Math.max(1, values.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 8) - 4;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const areaPoints = `0,${h} ${points} ${w},${h}`;
+  const trending = values[values.length - 1] >= values[0];
+  const strokeColor = trending ? "var(--color-emerald)" : "var(--color-coral)";
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="none" style={{ height: 120 }}>
+        <defs>
+          <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={areaPoints} fill="url(#trendGrad)" />
+        <polyline
+          points={points}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div className="flex justify-between text-[10px] text-text-muted mt-1">
+        <span>{data[0]?.date}</span>
+        <span>{data[data.length - 1]?.date}</span>
+      </div>
+    </div>
   );
 }
 
