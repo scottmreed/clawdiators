@@ -285,19 +285,24 @@ describe("checkAntiGaming", () => {
 // ── Gate 6: Score Distribution ────────────────────────────────────────
 
 describe("checkScoreDistribution", () => {
-  it("passes when reference > 60%, probes < 30%, no inversion", () => {
-    const result = checkScoreDistribution(700, [100, 150, 200], 1000);
+  it("passes when reference meets threshold and probes below ceiling (newcomer)", () => {
+    const result = checkScoreDistribution(700, [100, 150, 200], 1000, "newcomer");
     expect(result.passed).toBe(true);
   });
 
-  it("fails when reference score is below threshold", () => {
-    const result = checkScoreDistribution(500, [100, 150], 1000);
+  it("fails when reference score is below newcomer threshold (60%)", () => {
+    const result = checkScoreDistribution(500, [100, 150], 1000, "newcomer");
     expect(result.passed).toBe(false);
     expect(result.error).toMatch(/Reference score/);
   });
 
+  it("passes with lower reference for legendary difficulty (20%)", () => {
+    const result = checkScoreDistribution(250, [50, 100], 1000, "legendary");
+    expect(result.passed).toBe(true);
+  });
+
   it("fails when max probe score exceeds ceiling", () => {
-    const result = checkScoreDistribution(700, [400, 100], 1000);
+    const result = checkScoreDistribution(700, [300, 100], 1000, "newcomer");
     expect(result.passed).toBe(false);
     expect(result.error).toMatch(/probe score/);
   });
@@ -328,7 +333,7 @@ describe("runAllGates", () => {
     const mod = createDeclarativeModule(baseSpec);
     const data = mod.generateData(42, {});
     const correctAnswer = { value: data.groundTruth.value };
-    const report = await runAllGates(baseSpec, { seed: 42, answer: correctAnswer }, "abc123");
+    const report = await runAllGates(baseSpec, { seed: 42, answer: correctAnswer });
     expect(report.overall).not.toBe("fail");
     expect(report.gates.spec_validity.passed).toBe(true);
     expect(report.gates.determinism.passed).toBe(true);
@@ -337,56 +342,15 @@ describe("runAllGates", () => {
   });
 
   it("fails fast and marks all gates as skipped when spec is invalid", async () => {
-    const report = await runAllGates({ invalid: "spec" }, { seed: 42, answer: {} }, "abc123");
+    const report = await runAllGates({ invalid: "spec" }, { seed: 42, answer: {} });
     expect(report.overall).toBe("fail");
     expect(report.gates.spec_validity.passed).toBe(false);
     expect(report.gates.determinism.error).toMatch(/Skipped/);
     expect(report.gates.baseline_solveability.error).toMatch(/Skipped/);
   });
 
-  it("includes design_guide_hash gate result", async () => {
-    const mod = createDeclarativeModule(baseSpec);
-    const data = mod.generateData(42, {});
-    const report = await runAllGates(
-      baseSpec,
-      { seed: 42, answer: { value: data.groundTruth.value } },
-      "hash123",
-    );
-    expect(report.gates.design_guide_hash).toBeDefined();
-    expect(report.gates.design_guide_hash).toHaveProperty("passed");
-  });
-
-  it("warns (not fails) when design guide hash is missing from metadata", async () => {
-    const mod = createDeclarativeModule(baseSpec);
-    const data = mod.generateData(42, {});
-    const report = await runAllGates(
-      baseSpec, // no protocolMetadata field
-      { seed: 42, answer: { value: data.groundTruth.value } },
-      "somehash",
-    );
-    // Missing hash → design_guide_hash gate passes with a note
-    expect(report.gates.design_guide_hash.passed).toBe(true);
-  });
-
-  it("marks design guide hash gate as failed when hash mismatches", async () => {
-    const mod = createDeclarativeModule(baseSpec);
-    const data = mod.generateData(42, {});
-    const specWithWrongHash = {
-      ...baseSpec,
-      protocolMetadata: { designGuideHash: "wrong-hash-abc" },
-    };
-    const report = await runAllGates(
-      specWithWrongHash,
-      { seed: 42, answer: { value: data.groundTruth.value } },
-      "correct-hash-xyz",
-    );
-    expect(report.gates.design_guide_hash.passed).toBe(false);
-    // Other gates all pass → overall should be "warn" not "fail"
-    expect(["warn", "pass"]).toContain(report.overall);
-  });
-
   it("returns structured GateReport with all expected keys", async () => {
-    const report = await runAllGates({ invalid: "spec" }, { seed: 42, answer: {} }, "h");
+    const report = await runAllGates({ invalid: "spec" }, { seed: 42, answer: {} });
     const gateKeys = Object.keys(report.gates);
     expect(gateKeys).toContain("spec_validity");
     expect(gateKeys).toContain("determinism");
@@ -394,6 +358,5 @@ describe("runAllGates", () => {
     expect(gateKeys).toContain("baseline_solveability");
     expect(gateKeys).toContain("anti_gaming");
     expect(gateKeys).toContain("score_distribution");
-    expect(gateKeys).toContain("design_guide_hash");
   });
 });

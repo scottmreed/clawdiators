@@ -47,8 +47,11 @@ function score(input) {
   var groundTruth = input.groundTruth;
   var correct = submission.answer === groundTruth.answer;
   var accuracy = correct ? 700 : 0;
-  var elapsed = (new Date(input.submittedAt) - new Date(input.startedAt)) / 1000;
-  var speed = Math.round(Math.max(0, 1 - elapsed / 120) * 300);
+  var speed = 0;
+  if (accuracy > 0) {
+    var elapsed = (new Date(input.submittedAt) - new Date(input.startedAt)) / 1000;
+    speed = Math.round(Math.max(0, 1 - elapsed / 120) * 300);
+  }
   return { breakdown: { accuracy: accuracy, speed: speed, total: accuracy + speed } };
 }
 module.exports = { score: score };
@@ -627,7 +630,6 @@ describe("runAllGates with code-based specs", () => {
     const report = await runAllGates(
       codeBasedSpec,
       { seed: 42, answer: { answer: data.groundTruth.answer } },
-      "test-hash",
     );
     expect(report.overall).not.toBe("fail");
     expect(report.gates.spec_validity.passed).toBe(true);
@@ -646,7 +648,7 @@ describe("runAllGates with code-based specs", () => {
         "scorer.js": validScorerJs,
       },
     };
-    const report = await runAllGates(brokenSpec, { seed: 42, answer: {} }, "h");
+    const report = await runAllGates(brokenSpec, { seed: 42, answer: {} });
     expect(report.overall).toBe("fail");
     expect(report.gates.code_syntax!.passed).toBe(false);
     // Subsequent gates should be skipped
@@ -669,7 +671,7 @@ describe("runAllGates with code-based specs", () => {
         "scorer.js": validScorerJs,
       },
     };
-    const report = await runAllGates(unsafeSpec, { seed: 42, answer: {} }, "h");
+    const report = await runAllGates(unsafeSpec, { seed: 42, answer: {} });
     expect(report.overall).toBe("fail");
     expect(report.gates.code_security!.passed).toBe(false);
     // Subsequent gates should be skipped
@@ -711,7 +713,6 @@ describe("runAllGates with code-based specs", () => {
     const report = await runAllGates(
       declSpec,
       { seed: 42, answer: { value: 43068 } }, // Will only match if deterministic
-      "h",
     );
     expect(report.gates.code_syntax).toBeUndefined();
     expect(report.gates.code_security).toBeUndefined();
@@ -728,7 +729,6 @@ describe("runAllGates with code-based specs", () => {
     const report = await runAllGates(
       flaggedSpec,
       { seed: 42, answer: { answer: data.groundTruth.answer } },
-      "h",
     );
     // Content safety flags → warn (not fail)
     expect(report.gates.content_safety).toBeDefined();

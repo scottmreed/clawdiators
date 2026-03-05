@@ -9,8 +9,31 @@ import { createCodeModule } from "./code-module.js";
 import type { CommunitySpec } from "./validator.js";
 import type { ChallengeModule } from "../types.js";
 
-export const GATE_PASS_SCORE_THRESHOLD = 0.6;
-export const GATE_PROBE_SCORE_CEILING = 0.3;
+import type { Difficulty } from "@clawdiators/shared";
+
+// Difficulty-aware thresholds — harder challenges are allowed lower reference scores
+// so that truly novel/frontier challenges aren't blocked by the gates.
+const BASELINE_THRESHOLDS: Record<Difficulty, number> = {
+  newcomer: 0.6,
+  contender: 0.5,
+  veteran: 0.35,
+  legendary: 0.2,
+};
+
+const PROBE_CEILINGS: Record<Difficulty, number> = {
+  newcomer: 0.25,
+  contender: 0.25,
+  veteran: 0.2,
+  legendary: 0.15,
+};
+
+export function getBaselineThreshold(difficulty: Difficulty): number {
+  return BASELINE_THRESHOLDS[difficulty] ?? 0.5;
+}
+
+export function getProbeCeiling(difficulty: Difficulty): number {
+  return PROBE_CEILINGS[difficulty] ?? 0.25;
+}
 
 // ── Gate 1: Spec Validity ────────────────────────────────────────────
 
@@ -109,14 +132,15 @@ export function checkContractConsistency(spec: CommunitySpec): GateResult {
 // ── Gate 4: Baseline Solveability ────────────────────────────────────
 
 /**
- * Score a reference answer — must reach 60% of maxScore.
+ * Score a reference answer — must reach the difficulty-aware threshold.
  */
 export async function checkBaselineSolveability(
   spec: CommunitySpec,
   mod: ChallengeModule,
   referenceAnswer: { seed: number; answer: Record<string, unknown> },
 ): Promise<GateResult> {
-  const threshold = GATE_PASS_SCORE_THRESHOLD * spec.scoring.maxScore;
+  const pct = getBaselineThreshold(spec.difficulty as Difficulty);
+  const threshold = pct * spec.scoring.maxScore;
 
   let data: Awaited<ReturnType<typeof mod.generateData>>;
   try {
@@ -160,7 +184,7 @@ export async function checkBaselineSolveability(
       maxScore: spec.scoring.maxScore,
     },
     ...(!passed && {
-      error: `Reference answer scored ${total} < threshold ${threshold} (${Math.round(GATE_PASS_SCORE_THRESHOLD * 100)}% of ${spec.scoring.maxScore})`,
+      error: `Reference answer scored ${total} < threshold ${threshold} (${Math.round(pct * 100)}% of ${spec.scoring.maxScore} for ${spec.difficulty} difficulty)`,
     }),
   };
 }
@@ -168,7 +192,7 @@ export async function checkBaselineSolveability(
 // ── Gate 5: Anti-Gaming ──────────────────────────────────────────────
 
 /**
- * Run adversarial probes — all must score below 30% of maxScore.
+ * Run adversarial probes — all must score below the difficulty-aware ceiling.
  * Probes: empty submission, all-null fields, random UUID values.
  */
 export async function checkAntiGaming(
@@ -176,7 +200,8 @@ export async function checkAntiGaming(
   mod: ChallengeModule,
   referenceAnswer: { seed: number; answer: Record<string, unknown> },
 ): Promise<GateResult> {
-  const ceiling = GATE_PROBE_SCORE_CEILING * spec.scoring.maxScore;
+  const pct = getProbeCeiling(spec.difficulty as Difficulty);
+  const ceiling = pct * spec.scoring.maxScore;
   const probeKeys = Object.keys(referenceAnswer.answer);
 
   let data: Awaited<ReturnType<typeof mod.generateData>>;
@@ -248,7 +273,7 @@ export async function checkAntiGaming(
       maxScore: spec.scoring.maxScore,
     },
     ...(!passed && {
-      error: `Anti-gaming probe scored ${worstScore} >= ceiling ${ceiling} (${Math.round(GATE_PROBE_SCORE_CEILING * 100)}% of ${spec.scoring.maxScore})`,
+      error: `Anti-gaming probe scored ${worstScore} >= ceiling ${ceiling} (${Math.round(pct * 100)}% of ${spec.scoring.maxScore} for ${spec.difficulty} difficulty)`,
     }),
   };
 }
@@ -257,8 +282,8 @@ export async function checkAntiGaming(
 
 /**
  * Cross-reference gates 4 + 5:
- * - reference score >= 60%
- * - max probe score < 30%
+ * - reference score >= difficulty-aware baseline threshold
+ * - max probe score < difficulty-aware probe ceiling
  * - reference score > max probe score
  * Derived from earlier results — no new execution.
  */
@@ -266,17 +291,20 @@ export function checkScoreDistribution(
   referenceScore: number,
   probeScores: number[],
   maxScore: number,
+  difficulty: string = "contender",
 ): GateResult {
-  const passCeiling = GATE_PASS_SCORE_THRESHOLD * maxScore;
-  const probeCeiling = GATE_PROBE_SCORE_CEILING * maxScore;
+  const baselinePct = getBaselineThreshold(difficulty as Difficulty);
+  const probePct = getProbeCeiling(difficulty as Difficulty);
+  const passCeiling = baselinePct * maxScore;
+  const probeCeiling = probePct * maxScore;
   const maxProbeScore = probeScores.length > 0 ? Math.max(...probeScores) : 0;
   const issues: string[] = [];
 
   if (referenceScore < passCeiling) {
-    issues.push(`Reference score ${referenceScore} < ${passCeiling} (60% of ${maxScore})`);
+    issues.push(`Reference score ${referenceScore} < ${passCeiling} (${Math.round(baselinePct * 100)}% of ${maxScore} for ${difficulty})`);
   }
   if (maxProbeScore >= probeCeiling) {
-    issues.push(`Max probe score ${maxProbeScore} >= ${probeCeiling} (30% of ${maxScore})`);
+    issues.push(`Max probe score ${maxProbeScore} >= ${probeCeiling} (${Math.round(probePct * 100)}% of ${maxScore} for ${difficulty})`);
   }
   if (referenceScore <= maxProbeScore) {
     issues.push(`Score inversion: reference ${referenceScore} <= max probe ${maxProbeScore}`);
@@ -459,7 +487,6 @@ export function buildModuleForSpec(spec: CommunitySpec): ChallengeModule {
 export async function runAllGates(
   raw: unknown,
   referenceAnswer: { seed: number; answer: Record<string, unknown> },
-  currentDesignGuideHash: string,
 ): Promise<GateReport> {
   const generated_at = new Date().toISOString();
   const skipped: GateResult = { passed: false, details: {}, error: "Skipped — spec invalid" };
@@ -475,7 +502,6 @@ export async function runAllGates(
         baseline_solveability: skipped,
         anti_gaming: skipped,
         score_distribution: skipped,
-        design_guide_hash: skipped,
       },
       overall: "fail",
       generated_at,
@@ -510,7 +536,6 @@ export async function runAllGates(
           baseline_solveability: skipped,
           anti_gaming: skipped,
           score_distribution: skipped,
-          design_guide_hash: skipped,
         },
         overall: "fail",
         generated_at,
@@ -530,7 +555,6 @@ export async function runAllGates(
           baseline_solveability: { passed: false, details: {}, error: "Skipped — code security failed" },
           anti_gaming: { passed: false, details: {}, error: "Skipped — code security failed" },
           score_distribution: { passed: false, details: {}, error: "Skipped — code security failed" },
-          design_guide_hash: { passed: false, details: {}, error: "Skipped — code security failed" },
         },
         overall: "fail",
         generated_at,
@@ -561,7 +585,6 @@ export async function runAllGates(
         baseline_solveability: buildSkipped,
         anti_gaming: buildSkipped,
         score_distribution: buildSkipped,
-        design_guide_hash: buildSkipped,
       },
       overall: "fail",
       generated_at,
@@ -586,31 +609,7 @@ export async function runAllGates(
   }).probe_results ?? [];
   const probeScores = probeResults.map((p: { name: string; score: number }) => p.score);
   const referenceScore = (baselineResult.details as { score?: number }).score ?? 0;
-  const scoreDistResult = checkScoreDistribution(referenceScore, probeScores, spec.scoring.maxScore);
-
-  // Gate — design guide hash
-  let designGuideHashResult: GateResult;
-  const submittedHash = (raw as Record<string, unknown>)?.protocolMetadata as
-    | { designGuideHash?: string }
-    | undefined;
-  if (submittedHash?.designGuideHash) {
-    const matches = submittedHash.designGuideHash === currentDesignGuideHash;
-    designGuideHashResult = {
-      passed: matches,
-      details: {
-        submitted: submittedHash.designGuideHash,
-        current: currentDesignGuideHash,
-      },
-      ...(!matches && {
-        error: `Design guide hash mismatch — spec authored against outdated guide`,
-      }),
-    };
-  } else {
-    designGuideHashResult = {
-      passed: true,
-      details: { note: "No designGuideHash provided in protocolMetadata — skipped" },
-    };
-  }
+  const scoreDistResult = checkScoreDistribution(referenceScore, probeScores, spec.scoring.maxScore, spec.difficulty);
 
   // ── Overall verdict ────────────────────────────────────────────────
 
@@ -627,13 +626,12 @@ export async function runAllGates(
   if (codeSecurityResult) coreGates.push(codeSecurityResult);
 
   const anyFailed = coreGates.some((g) => !g.passed);
-  const designGuideFailed = !designGuideHashResult.passed;
   const hasContentSafetyFlags = contentSafetyResult?.details?.requires_admin_review === true;
 
   let overall: "pass" | "fail" | "warn";
   if (anyFailed) {
     overall = "fail";
-  } else if (designGuideFailed || hasContentSafetyFlags) {
+  } else if (hasContentSafetyFlags) {
     overall = "warn";
   } else {
     overall = "pass";
@@ -650,7 +648,6 @@ export async function runAllGates(
       baseline_solveability: baselineResult,
       anti_gaming: antiGamingResult,
       score_distribution: scoreDistResult,
-      design_guide_hash: designGuideHashResult,
     },
     overall,
     generated_at,

@@ -7,18 +7,10 @@ import { getCache, setCache } from "../lib/route-cache.js";
 import { getChallenge } from "../challenges/registry.js";
 import { buildWorkspaceArchive, type ChallengeMdContext } from "../challenges/workspace.js";
 import { getChallengeAnalytics } from "../services/analytics.js";
-import { getDesignGuideHash } from "../startup.js";
 import { getAllowedImages } from "../challenges/primitives/validator.js";
 
 
 export const challengeRoutes = new Hono();
-
-// GET /challenges/design-guide-hash — current SHA-256 of challenge-design-guide.md
-// Public endpoint — authors include this hash in their draft submissions.
-challengeRoutes.get("/design-guide-hash", (c) => {
-  const { hash, computed_at } = getDesignGuideHash();
-  return envelope(c, { hash, computed_at });
-});
 
 // GET /challenges/images — public endpoint returning allowed Docker images for challenge specs
 challengeRoutes.get("/images", (c) => {

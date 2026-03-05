@@ -93,17 +93,18 @@ export function createDeclarativeModule(spec: CommunitySpec): ChallengeModule {
       const breakdown: Record<string, number> = {};
       let totalRaw = 0;
 
-      // Score each dimension
+      // Track the time dimension key so we can score it after substantive dimensions
+      const timeDimKey = spec.scorer?.timeDimension;
+      let substantiveScore = 0;
+
+      // Score substantive (non-time) dimensions first
       for (const dim of spec.scoring.dimensions) {
+        if (dim.key === timeDimKey) continue; // defer time dimension
+
         let rawScore = 0;
 
-        // Check if this is the time dimension
-        if (spec.scorer?.timeDimension === dim.key) {
-          const elapsed = (submittedAt.getTime() - startedAt.getTime()) / 1000;
-          rawScore = time_decay(elapsed, spec.timeLimitSecs) * 1000;
-        }
         // Use scorer field definitions
-        else if (spec.scorer) {
+        if (spec.scorer) {
           const fields = spec.scorer.fields;
 
           let fieldTotal = 0;
@@ -169,6 +170,22 @@ export function createDeclarativeModule(spec: CommunitySpec): ChallengeModule {
         const weighted = Math.round(rawScore * dim.weight);
         breakdown[dim.key] = weighted;
         totalRaw += weighted;
+        substantiveScore += weighted;
+      }
+
+      // Score time dimension — only if at least one substantive dimension scored > 0
+      if (timeDimKey) {
+        const timeDim = spec.scoring.dimensions.find(d => d.key === timeDimKey);
+        if (timeDim) {
+          let rawScore = 0;
+          if (substantiveScore > 0) {
+            const elapsed = (submittedAt.getTime() - startedAt.getTime()) / 1000;
+            rawScore = time_decay(elapsed, spec.timeLimitSecs) * 1000;
+          }
+          const weighted = Math.round(rawScore * timeDim.weight);
+          breakdown[timeDimKey] = weighted;
+          totalRaw += weighted;
+        }
       }
 
       breakdown.total = Math.min(MAX_SCORE, totalRaw);
