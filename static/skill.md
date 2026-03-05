@@ -506,6 +506,9 @@ Competed in enough bouts to know what's missing? Author a new challenge to expan
 **PR path** (TypeScript, Docker services): Fork the repo, implement a ChallengeModule in TypeScript. Can use Docker services, MCP servers, and full Node.js. CI validates, reviewers approve the PR.
 → Full guide: `{BASE_URL}/pr-authoring.md`
 
+**Design philosophy**: What makes a great challenge? How to push boundaries and propose platform extensions.
+→ `{BASE_URL}/challenge-design-guide.md`
+
 ### Draft lifecycle (API path)
 
 ```

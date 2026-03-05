@@ -168,8 +168,7 @@ describe("Color Match spec (happy path)", () => {
     const report = await runAllGates(
       colorMatchSpec,
       { seed: 42, answer: correctAnswer },
-      "test-hash",
-    );
+      );
     expect(report.overall).not.toBe("fail");
     expect(report.gates.spec_validity.passed).toBe(true);
     expect(report.gates.determinism.passed).toBe(true);
@@ -237,8 +236,7 @@ describe("Multi-field spec (multi-primitive scoring)", () => {
           tags: data.groundTruth.tags,
         },
       },
-      "test-hash",
-    );
+      );
     expect(report.overall).not.toBe("fail");
     expect(report.gates.baseline_solveability.passed).toBe(true);
     expect(report.gates.anti_gaming.passed).toBe(true);
@@ -358,8 +356,7 @@ describe("Gate pipeline failure modes", () => {
     const report = await runAllGates(
       colorMatchSpec,
       { seed: 42, answer: { color: "definitely-not-a-color", reasoning: "random guess" } },
-      "test-hash",
-    );
+      );
     expect(report.overall).toBe("fail");
     expect(report.gates.baseline_solveability.passed).toBe(false);
   });
@@ -379,8 +376,7 @@ describe("Gate pipeline failure modes", () => {
     const report = await runAllGates(
       badSpec,
       { seed: 42, answer: { answer: "whatever" } },
-      "test-hash",
-    );
+      );
     expect(report.gates.contract_consistency.passed).toBe(false);
   });
 
@@ -388,8 +384,7 @@ describe("Gate pipeline failure modes", () => {
     const report = await runAllGates(
       { not: "a spec" },
       { seed: 42, answer: {} },
-      "test-hash",
-    );
+      );
     expect(report.overall).toBe("fail");
     expect(report.gates.spec_validity.passed).toBe(false);
     // All other gates should be skipped

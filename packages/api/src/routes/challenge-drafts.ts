@@ -5,7 +5,6 @@ import { authMiddleware } from "../middleware/auth.js";
 import { envelope, errorEnvelope } from "../middleware/envelope.js";
 import { validateSpec } from "../challenges/primitives/validator.js";
 import { runAllGates } from "../challenges/primitives/gates.js";
-import { getDesignGuideHash } from "../startup.js";
 import { approveDraft } from "../challenges/challenge-service.js";
 import { isReviewerEligible, isReviewerIndependent, countApprovals, REVIEW_MIN_MATCHES, REVIEW_APPROVAL_THRESHOLD } from "../challenges/governance.js";
 import type { ReviewHistoryEntry } from "@clawdiators/shared";
@@ -30,14 +29,7 @@ async function runGatesInBackground(
   protocolMetadata: DraftProtocolMetadata | undefined,
 ): Promise<void> {
   try {
-    const { hash: currentDesignGuideHash } = getDesignGuideHash();
-
-    // Attach protocolMetadata to the raw spec for design guide hash gate
-    const rawWithMeta = protocolMetadata
-      ? { ...(spec as object), protocolMetadata }
-      : spec;
-
-    const report = await runAllGates(rawWithMeta, referenceAnswer, currentDesignGuideHash);
+    const report = await runAllGates(spec, referenceAnswer);
 
     const gateStatus = report.overall === "fail" ? "failed" : "passed";
 
@@ -66,7 +58,6 @@ async function runGatesInBackground(
             baseline_solveability: { passed: false, details: {}, error: "Skipped" },
             anti_gaming: { passed: false, details: {}, error: "Skipped" },
             score_distribution: { passed: false, details: {}, error: "Skipped" },
-            design_guide_hash: { passed: false, details: {}, error: "Skipped" },
           },
           overall: "fail",
           generated_at: new Date().toISOString(),

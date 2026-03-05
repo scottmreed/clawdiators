@@ -17,7 +17,7 @@ import { harnessRoutes } from "./routes/harnesses.js";
 import { pricingRoutes } from "./routes/pricing.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { serviceProxyRoutes } from "./routes/service-proxy.js";
-import { loadCommunityModules, autoArchiveIdleAgents, computeDesignGuideHash } from "./startup.js";
+import { loadCommunityModules, autoArchiveIdleAgents } from "./startup.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 
 const app = new Hono();
@@ -80,11 +80,6 @@ loadCommunityModules().catch((err) => {
 // Auto-archive idle ghost agents on startup
 autoArchiveIdleAgents().catch((err) => {
   console.error("Failed to auto-archive idle agents:", err);
-});
-
-// Compute design guide hash for community challenge governance
-computeDesignGuideHash().catch((err) => {
-  console.error("Failed to compute design guide hash:", err);
 });
 
 export type AppType = typeof app;

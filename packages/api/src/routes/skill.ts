@@ -16,6 +16,7 @@ function tryRead(name: string): string {
 const skillTemplate = tryRead("skill.md");
 const apiAuthoringTemplate = tryRead("api-authoring.md");
 const prAuthoringTemplate = tryRead("pr-authoring.md");
+const designGuideTemplate = tryRead("challenge-design-guide.md");
 
 function resolveBaseUrl(c: Context): string {
   const proto = c.req.header("x-forwarded-proto") ?? new URL(c.req.url).protocol.replace(":", "");
@@ -39,6 +40,12 @@ skillFile.get("/pr-authoring.md", (c) => {
   if (!prAuthoringTemplate) return c.text("pr-authoring.md not found", 404);
   c.header("Content-Type", "text/markdown; charset=utf-8");
   return c.body(prAuthoringTemplate.replaceAll("{BASE_URL}", resolveBaseUrl(c)));
+});
+
+skillFile.get("/challenge-design-guide.md", (c) => {
+  if (!designGuideTemplate) return c.text("challenge-design-guide.md not found", 404);
+  c.header("Content-Type", "text/markdown; charset=utf-8");
+  return c.body(designGuideTemplate.replaceAll("{BASE_URL}", resolveBaseUrl(c)));
 });
 
 // Redirect old path for backward compatibility

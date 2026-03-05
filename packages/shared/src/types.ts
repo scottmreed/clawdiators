@@ -299,8 +299,7 @@ export interface ScoringSpec {
 // ── Challenge Governance Types ───────────────────────────────────────
 
 export interface DraftProtocolMetadata {
-  designGuideHash: string;   // SHA-256 of challenge-design-guide.md at authoring time
-  complianceChecklist: {
+  complianceChecklist?: {
     solvedAsExternalAgent: boolean;
     wrongFormatWarningsTested: boolean;
     antiGamingProbeTested: boolean;
@@ -325,7 +324,6 @@ export interface GateReport {
     baseline_solveability: GateResult;
     anti_gaming: GateResult;
     score_distribution: GateResult;
-    design_guide_hash: GateResult;
   };
   overall: "pass" | "fail" | "warn";
   generated_at: string;

@@ -29,8 +29,8 @@ import {
   checkContentSafety,
   runAllGates,
   buildModuleForSpec,
-  GATE_PASS_SCORE_THRESHOLD,
-  GATE_PROBE_SCORE_CEILING,
+  getBaselineThreshold,
+  getProbeCeiling,
 } from "../src/challenges/primitives/gates.js";
 import { validateSpec } from "../src/challenges/primitives/validator.js";
 import type { CommunitySpec } from "../src/challenges/primitives/validator.js";
@@ -52,8 +52,6 @@ import { isReviewerEligible, REVIEW_MIN_MATCHES } from "../src/challenges/govern
 // ════════════════════════════════════════════════════════════════════════
 // Helpers — shared fixtures for specs & verdicts
 // ════════════════════════════════════════════════════════════════════════
-
-const DESIGN_GUIDE_HASH = "test-hash-000";
 
 /** Minimal valid 2-dimension scoring block. */
 function dims(weights: [number, number]): CommunitySpec["scoring"]["dimensions"] {
@@ -120,8 +118,11 @@ function score(input) {
   var gt = input.groundTruth;
   var correct = sub.answer === gt.answer;
   var accuracy = correct ? 700 : 0;
-  var elapsed = (new Date(input.submittedAt) - new Date(input.startedAt)) / 1000;
-  var speed = Math.round(Math.max(0, 1 - elapsed / 120) * 300);
+  var speed = 0;
+  if (accuracy > 0) {
+    var elapsed = (new Date(input.submittedAt) - new Date(input.startedAt)) / 1000;
+    speed = Math.round(Math.max(0, 1 - elapsed / 120) * 300);
+  }
   return { breakdown: { accuracy: accuracy, speed: speed, total: accuracy + speed } };
 }
 module.exports = { score: score };
@@ -317,7 +318,7 @@ module.exports = { validate: validate };
       const mod = buildModuleForSpec(spec);
       const data = await mod.generateData(42, {});
       const ref = { seed: 42, answer: { distances: data.groundTruth.distances } };
-      const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+      const report = await runAllGates(spec, ref);
       expect(report.overall).toBe("pass");
     });
 
@@ -339,7 +340,7 @@ module.exports = { validate: validate };
       const mod = buildModuleForSpec(spec);
       const data = await mod.generateData(42, {});
       const now = new Date();
-      const ceiling = GATE_PROBE_SCORE_CEILING * spec.scoring.maxScore;
+      const ceiling = getProbeCeiling(spec.difficulty as "newcomer" | "contender" | "veteran" | "legendary") * spec.scoring.maxScore;
 
       for (const probe of [{}, { distances: null }, { distances: "uuid-garbage" }]) {
         const result = await mod.score({
@@ -452,7 +453,7 @@ module.exports = { validate: validate };
       const mod = buildModuleForSpec(forensicsSpec);
       const data = await mod.generateData(42, {});
       const ref = { seed: 42, answer: { ...data.groundTruth } };
-      const report = await runAllGates(forensicsSpec, ref, DESIGN_GUIDE_HASH);
+      const report = await runAllGates(forensicsSpec, ref);
       expect(report.overall).toBe("pass");
     });
 
@@ -1473,8 +1474,8 @@ function score(input) {
   var correct = 0; var total = 0;
   for(var i=0;i<n;i++){if(d[i]!==undefined){total++;if(sd[i]===d[i])correct++;}}
   var acc = total>0 ? Math.round((correct/total)*700) : 0;
-  var elapsed = (new Date(input.submittedAt)-new Date(input.startedAt))/1000;
-  var speed = Math.round(Math.max(0,1-elapsed/120)*300);
+  var speed = 0;
+  if(acc>0){var elapsed=(new Date(input.submittedAt)-new Date(input.startedAt))/1000;speed=Math.round(Math.max(0,1-elapsed/120)*300);}
   return { breakdown: { accuracy: acc, speed: speed, total: acc+speed } };
 }
 module.exports = { score: score };
@@ -1486,7 +1487,7 @@ module.exports = { score: score };
     const mod = buildModuleForSpec(spec);
     const data = await mod.generateData(42, {});
     const ref = { seed: 42, answer: { distances: data.groundTruth.distances } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.overall).toBe("pass");
     expect(report.gates.spec_validity.passed).toBe(true);
     expect(report.gates.code_syntax!.passed).toBe(true);
@@ -1525,7 +1526,7 @@ module.exports = { score: score };
     const mod = buildModuleForSpec(spec);
     const data = await mod.generateData(42, {});
     const ref = { seed: 42, answer: { suspect: data.groundTruth.suspect, case_number: data.groundTruth.case_number } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.overall).toBe("pass");
     // Declarative specs should NOT have code_syntax or code_security
     expect(report.gates.code_syntax).toBeUndefined();
@@ -1541,7 +1542,7 @@ module.exports = { generateData: generateData };
 `;
     const spec = codeSpec({ "data.js": badDataJs });
     const ref = { seed: 42, answer: {} };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.overall).toBe("fail");
     expect(report.gates.code_syntax!.passed).toBe(false);
     // Security and content safety skipped
@@ -1557,32 +1558,11 @@ module.exports = { score: score };
 `;
     const spec = codeSpec({ "scorer.js": scorerJs });
     const ref = { seed: 42, answer: { answer: 1 } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.overall).toBe("fail");
     expect(report.gates.code_security!.passed).toBe(false);
     expect(report.gates.determinism.passed).toBe(false);
     expect(report.gates.determinism.error).toContain("Skipped");
-  });
-
-  it("matching designGuideHash → design_guide_hash passes", async () => {
-    const spec = declSpec();
-    const mod = buildModuleForSpec(spec);
-    const data = await mod.generateData(42, {});
-    const specWithHash = { ...spec, protocolMetadata: { designGuideHash: "matching-hash" } };
-    const ref = { seed: 42, answer: { value: data.groundTruth.value } };
-    const report = await runAllGates(specWithHash, ref, "matching-hash");
-    expect(report.gates.design_guide_hash.passed).toBe(true);
-  });
-
-  it("mismatching designGuideHash → overall = 'warn'", async () => {
-    const spec = declSpec();
-    const mod = buildModuleForSpec(spec);
-    const data = await mod.generateData(42, {});
-    const specWithHash = { ...spec, protocolMetadata: { designGuideHash: "old-hash" } };
-    const ref = { seed: 42, answer: { value: data.groundTruth.value } };
-    const report = await runAllGates(specWithHash, ref, "new-hash");
-    expect(report.gates.design_guide_hash.passed).toBe(false);
-    expect(report.overall).toBe("warn");
   });
 
   it("content safety flag → overall = 'warn' (not fail)", async () => {
@@ -1592,7 +1572,7 @@ module.exports = { score: score };
     const mod = buildModuleForSpec(spec);
     const data = await mod.generateData(42, {});
     const ref = { seed: 42, answer: { answer: data.groundTruth.answer } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     // Content safety flags don't block — overall should be "warn" not "fail"
     if (report.gates.content_safety?.details?.requires_admin_review) {
       expect(report.overall).toBe("warn");
@@ -1604,7 +1584,7 @@ module.exports = { score: score };
     const mod = buildModuleForSpec(spec);
     const data = await mod.generateData(42, {});
     const ref = { seed: 42, answer: { answer: data.groundTruth.answer } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.gates.code_syntax).toBeDefined();
     expect(report.gates.code_security).toBeDefined();
   });
@@ -1614,7 +1594,7 @@ module.exports = { score: score };
     const mod = buildModuleForSpec(spec);
     const data = await mod.generateData(42, {});
     const ref = { seed: 42, answer: { value: data.groundTruth.value } };
-    const report = await runAllGates(spec, ref, DESIGN_GUIDE_HASH);
+    const report = await runAllGates(spec, ref);
     expect(report.gates.code_syntax).toBeUndefined();
     expect(report.gates.code_security).toBeUndefined();
   });
