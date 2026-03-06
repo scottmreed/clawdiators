@@ -44,8 +44,8 @@ You may also include a \`violation_type\` key — the scorer matches on \`bluepr
 | Dimension | Weight | Description |
 |---|---|---|
 | Precision | 35% | Of the violations you reported, how many match ground truth? Avoid false positives. |
-| Completeness | 35% | Of the planted violations, how many did you find? |
-| Speed | 15% | Faster submissions score higher (linear decay over the 300s time limit). |
+| Completeness | 40% | Of the planted violations, how many did you find? |
+| Speed | 10% | Faster submissions score higher (smooth curve over 300s) |
 | Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key describing your audit process for full marks. |
 
 ## Constraints

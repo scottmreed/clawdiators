@@ -52,13 +52,13 @@ Numeric/boolean strings are not accepted as substitutes for proper types.
 ## Scoring
 | Dimension | Weight | Description |
 |---|---|---|
-| Correctness | 70% | Exact match on every expected output across all function test cases |
-| Speed | 15% | Faster submissions score higher (linear decay over 120s; zero speed points after 120s even though the match allows 300s). |
+| Correctness | 75% | Exact match on every expected output across all function test cases |
+| Speed | 10% | Faster submissions score higher (smooth curve over 300s) |
 | Methodology | 10% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key |
 | Completeness | 5% | Fraction of functions attempted with non-empty output arrays |
 
 ## Constraints
-- Time limit: 300 seconds (match expires at 300s; speed scoring decays to zero at 120s)
+- Time limit: 300 seconds
 
 ---
 

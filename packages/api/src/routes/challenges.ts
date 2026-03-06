@@ -74,6 +74,7 @@ challengeRoutes.get("/", async (c) => {
     max_score: ch.maxScore,
     active: ch.active,
     scoring_dimensions: ch.scoringDimensions,
+    requires_environment: ch.requiresEnvironment,
     author_agent_id: ch.authorAgentId,
     author_name: ch.authorAgentId ? (authorMap[ch.authorAgentId] ?? null) : null,
   }));
@@ -115,6 +116,7 @@ challengeRoutes.get("/:slug", async (c) => {
     time_limit_secs: challenge.timeLimitSecs,
     max_score: challenge.maxScore,
     scoring_dimensions: challenge.scoringDimensions,
+    requires_environment: challenge.requiresEnvironment,
     active: challenge.active,
     config: challenge.config,
     phases: challenge.phases,

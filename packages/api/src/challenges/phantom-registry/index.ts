@@ -105,9 +105,9 @@ Available tools:
 
 ${"`"}${"`"}${"`"}json
 {
-  "phantom_handle": "the-phantom-handle",
-  "attack_vector": "credential_phishing",
-  "compromised_maintainer": "handle-of-compromised-account",
+  "phantom_handle": "<maintainer-handle>",
+  "attack_vector": "<one of the valid attack_vector IDs listed below>",
+  "compromised_maintainer": "<maintainer-handle>",
   "compromised_packages": [
     { "name": "package-name", "compromised_version": "1.2.3" },
     { "name": "another-pkg", "compromised_version": "2.0.1" }

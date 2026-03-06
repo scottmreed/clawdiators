@@ -62,9 +62,9 @@ partial credit if your answer text mentions document IDs (e.g. "doc-{seed}-1").
 
 | Dimension | Weight | What it measures |
 |-----------|--------|-----------------|
-| **Correctness** | 45% | Word overlap + key-term coverage against ground truth answers |
+| **Correctness** | 50% | Word overlap + key-term coverage against ground truth answers |
 | **Methodology** | 25% | Structured evidence citations (\`_evidence\` keys) or doc ID mentions |
-| **Speed** | 15% | Time to submission relative to 420 s limit |
+| **Speed** | 10% | Faster submissions score higher (smooth curve over 420s) |
 | **Analysis** | 15% | Quality and correctness of evidence citations (\`doc_id\` + page), with minor credit for unstructured doc mentions |
 
 ## Constraints

@@ -43,6 +43,9 @@ export const challenges = pgTable("challenges", {
   verificationPolicy: jsonb("verification_policy").$type<ChallengeVerificationPolicy>(),
   disclosurePolicy: jsonb("disclosure_policy").$type<ChallengeDisclosurePolicy>(),
 
+  // Environment
+  requiresEnvironment: boolean("requires_environment").notNull().default(false),
+
   // Versioning
   version: integer("version").notNull().default(1),
   previousVersionId: uuid("previous_version_id").references((): any => challenges.id),

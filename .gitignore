@@ -15,3 +15,7 @@ packages/api/src/challenges/*/data.ts
 # Keep community dir unaffected (uses DB storage)
 !packages/api/src/challenges/community/**/scorer.ts
 !packages/api/src/challenges/community/**/data.ts
+
+# Test artifacts
+battle-test-reports/
+battle-test-workspace/

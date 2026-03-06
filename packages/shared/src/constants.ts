@@ -243,47 +243,47 @@ export function dims(
 // ── Challenge Dimension Exports ──────────────────────────────────────
 
 export const CIPHER_FORGE_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.65, speed: 0.20, methodology: 0.15 },
+  { correctness: 0.75, speed: 0.10, methodology: 0.15 },
   { correctness: { description: "Decryption accuracy including difficulty bonus" }, methodology: { description: "Structured approach to cryptanalysis" } },
 );
 
 export const LOGIC_REEF_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.50, methodology: 0.20, speed: 0.15, completeness: 0.15 },
+  { correctness: 0.55, methodology: 0.20, speed: 0.10, completeness: 0.15 },
   { correctness: { description: "Correctness of logical conclusions" }, methodology: { description: "Quality of logical reasoning steps" }, completeness: { description: "Fraction of puzzles attempted" } },
 );
 
 export const REEF_REFACTOR_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.70, speed: 0.15, methodology: 0.10, completeness: 0.05 },
+  { correctness: 0.75, speed: 0.10, methodology: 0.10, completeness: 0.05 },
   { correctness: { description: "Exact correctness across all function test cases" }, completeness: { description: "Fraction of functions attempted with non-empty outputs" }, methodology: { description: "Clear, specific debugging approach" } },
 );
 
 export const DEPTH_FIRST_GEN_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.70, speed: 0.15, methodology: 0.10, completeness: 0.05 },
+  { correctness: 0.75, speed: 0.10, methodology: 0.10, completeness: 0.05 },
   { correctness: { description: "Exact correctness across all hidden test outputs" }, completeness: { description: "Percentage of test cases attempted" }, methodology: { description: "Substantive rule-inference explanation" } },
 );
 
 export const ARCHIVE_DIVE_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.45, methodology: 0.25, speed: 0.15, analysis: 0.15 },
+  { correctness: 0.50, methodology: 0.25, speed: 0.10, analysis: 0.15 },
   { correctness: { description: "Correctness of cross-document synthesis answers" }, methodology: { description: "Evidence citations and document coverage" }, analysis: { description: "Quality and accuracy of source citations" } },
 );
 
 export const CONTRACT_REVIEW_DIMENSIONS: ScoringDimension[] = dims(
-  { precision: 0.35, completeness: 0.35, speed: 0.15, methodology: 0.15 },
+  { precision: 0.35, completeness: 0.40, speed: 0.10, methodology: 0.15 },
   { precision: { description: "Reported issues that are actual issues" }, completeness: { description: "Fraction of planted issues found" }, methodology: { description: "Structured approach to contract analysis" } },
 );
 
 export const CHART_FORENSICS_DIMENSIONS: ScoringDimension[] = dims(
-  { precision: 0.35, completeness: 0.35, speed: 0.15, methodology: 0.15 },
+  { precision: 0.40, completeness: 0.35, speed: 0.10, methodology: 0.15 },
   { precision: { description: "Reported discrepancies that are actual misrepresentations" }, completeness: { description: "Fraction of planted misrepresentations found" }, methodology: { description: "Structured approach to data verification" } },
 );
 
 export const CARTOGRAPHERS_EYE_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.35, analysis: 0.30, speed: 0.15, methodology: 0.20 },
+  { correctness: 0.40, analysis: 0.30, speed: 0.10, methodology: 0.20 },
   { correctness: { description: "Correctness of spatial reasoning answers" }, analysis: { description: "Quality of distance and direction analysis" }, methodology: { description: "Structured approach to spatial analysis" } },
 );
 
 export const BLUEPRINT_AUDIT_DIMENSIONS: ScoringDimension[] = dims(
-  { precision: 0.35, completeness: 0.35, speed: 0.15, methodology: 0.15 },
+  { precision: 0.35, completeness: 0.40, speed: 0.10, methodology: 0.15 },
   { precision: { description: "Reported violations that are actual violations" }, completeness: { description: "Fraction of planted violations found" }, methodology: { description: "Structured approach to code compliance" } },
 );
 
@@ -298,12 +298,12 @@ export const THE_MIRAGE_DIMENSIONS: ScoringDimension[] = dims(
 );
 
 export const DEEP_MAPPING_DIMENSIONS: ScoringDimension[] = dims(
-  { completeness: 0.35, correctness: 0.30, methodology: 0.20, speed: 0.15 },
+  { completeness: 0.40, correctness: 0.30, methodology: 0.20, speed: 0.10 },
   { completeness: { description: "Percentage of map nodes discovered" }, correctness: { description: "Correct identification of key features" }, methodology: { description: "Resource collection path quality" }, speed: { description: "Efficiency of exploration approach" } },
 );
 
 export const CODEBASE_ARCHAEOLOGY_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.35, code_quality: 0.30, speed: 0.15, methodology: 0.20 },
+  { correctness: 0.40, code_quality: 0.30, speed: 0.10, methodology: 0.20 },
   { correctness: { description: "Correctly identifying the buggy commit and root cause" }, code_quality: { description: "Correctness and quality of the code fix" }, methodology: { description: "Structured approach to debugging" } },
 );
 
@@ -313,7 +313,7 @@ export const NEEDLE_HAYSTACK_DIMENSIONS: ScoringDimension[] = dims(
 );
 
 export const PERFORMANCE_OPTIMIZER_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.40, code_quality: 0.25, speed: 0.15, methodology: 0.20 },
+  { correctness: 0.45, code_quality: 0.25, speed: 0.10, methodology: 0.20 },
   { correctness: { description: "Quality of algorithmic improvement" }, code_quality: { description: "Whether optimized code preserves behavior" }, methodology: { description: "Quality of explanation and approach" } },
 );
 
@@ -323,13 +323,18 @@ export const LIGHTHOUSE_INCIDENT_DIMENSIONS: ScoringDimension[] = dims(
 );
 
 export const REEF_RESCUE_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.25, code_quality: 0.25, completeness: 0.15, methodology: 0.20, speed: 0.15 },
+  { correctness: 0.30, code_quality: 0.25, completeness: 0.15, methodology: 0.20, speed: 0.10 },
   { correctness: { description: "Correctly identified root causes for failing subsystems" }, code_quality: { description: "Code fixes resolve the bugs without introducing new issues" }, completeness: { description: "Data migration correctly repairs corrupted data" }, methodology: { description: "Evidence quality, technical references, and incident report completeness" } },
 );
 
 export const PIPELINE_BREACH_DIMENSIONS: ScoringDimension[] = dims(
   { correctness: 0.20, completeness: 0.45, code_quality: 0.15, methodology: 0.20 },
   { correctness: { description: "Correct attack vector ID with evidence from build logs and artifact database" }, completeness: { description: "Accuracy of blast radius and correct remediation actions in priority order" }, code_quality: { description: "Automated remediation script: verification steps, secret rotation, clean rebuild" }, methodology: { description: "Multi-source forensic investigation and structured security advisory" } },
+);
+
+export const QUICKDRAW_DIMENSIONS: ScoringDimension[] = dims(
+  { correctness: 0.85, speed: 0.10, methodology: 0.05 },
+  { correctness: { description: "Exact passphrase match from signal.json" }, methodology: { description: "Evidence of reading workspace files" } },
 );
 
 export const PHANTOM_REGISTRY_DIMENSIONS: ScoringDimension[] = dims(

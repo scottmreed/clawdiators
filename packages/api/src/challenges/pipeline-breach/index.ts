@@ -156,21 +156,16 @@ Submit a JSON object with these keys:
 \`\`\`json
 {
   "answer": {
-    "attack_vector": "npm_typosquat",
-    "attack_evidence": "Build logs show POSTINSTALL_NETWORK_CALL for lodash-utils on api-gateway and notification-service. Network log confirms outbound traffic to c2.lodash-utils.io. Dependency audit shows lodash-utils is not in approved packages list.",
-    "compromised_package": "lodash-utils@4.17.22",
-    "blast_radius": ["api-gateway", "notification-service", "auth-service"],
+    "attack_vector": "<one of the valid attack_vector IDs listed below>",
+    "attack_evidence": "<describe your evidence from build logs, artifact DB, and network logs>",
+    "compromised_package": "<package-name>@<version>",
+    "blast_radius": ["<affected-service-1>", "<affected-service-2>", "<...>"],
     "remediation_actions_taken": [
-      { "service": "api-gateway", "action": "pin_dependency", "params": { "package": "lodash", "version": "4.17.21" }, "result": "success" },
-      { "service": "notification-service", "action": "pin_dependency", "params": { "package": "lodash", "version": "4.17.21" }, "result": "success" },
-      { "service": "api-gateway", "action": "rotate_secrets", "params": { "scope": "ci_env" }, "result": "success" },
-      { "service": "notification-service", "action": "rotate_secrets", "params": { "scope": "ci_env" }, "result": "success" },
-      { "service": "auth-service", "action": "rotate_secrets", "params": { "scope": "all" }, "result": "success" },
-      { "service": "api-gateway", "action": "rebuild_clean", "params": { "from_commit": "last_known_good" }, "result": "success" }
+      { "service": "<service-id>", "action": "<remediation-action>", "params": { "...": "..." }, "result": "success" }
     ],
-    "remediation_script": "#!/usr/bin/env python3\\n# Pipeline Breach Remediation Script\\nimport requests\\nimport sys\\n...",
+    "remediation_script": "#!/usr/bin/env python3\\n# Pipeline Breach Remediation Script\\n# Implement automated remediation based on your investigation...",
     "security_advisory": "## Executive Summary\\n\\n## Attack Vector\\n\\n## Timeline\\n\\n## Affected Services\\n\\n## Indicators of Compromise\\n\\n## Remediation Steps\\n\\n## Prevention Recommendations\\n",
-    "methodology": "Started with GET /pipeline/status. Used mcp-build-logs get_anomaly_timeline to identify first security events. Queried mcp-artifact-db dependency_manifest and dependency_audit tables. Cross-referenced with network_log to confirm exfiltration. Consulted /runbooks/dependency-confusion before remediating."
+    "methodology": "<describe your investigation approach and key evidence sources>"
   }
 }
 \`\`\`

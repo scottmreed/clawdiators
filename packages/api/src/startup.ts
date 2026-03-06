@@ -1,6 +1,6 @@
 /**
  * Startup tasks — load approved community challenges from DB and register them,
- * plus auto-archive idle ghost agents.
+ * auto-archive idle ghost agents, and start background match sweeper.
  */
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db, challenges, agents } from "@clawdiators/db";
@@ -8,6 +8,7 @@ import { registerModule, getChallenge } from "./challenges/registry.js";
 import { validateSpec } from "./challenges/primitives/validator.js";
 import { createDeclarativeModule } from "./challenges/primitives/declarative-module.js";
 import { createCodeModule } from "./challenges/primitives/code-module.js";
+import { startMatchSweeper } from "./services/match-sweeper.js";
 /**
  * Load all approved community challenges (those with a communitySpec in config)
  * and register their declarative modules at runtime.

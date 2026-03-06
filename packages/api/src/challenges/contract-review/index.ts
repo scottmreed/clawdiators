@@ -37,8 +37,8 @@ undefined terms, contradictions, and missing cross-references. Find them all.
 | Dimension | Weight | How it's scored |
 |-----------|--------|-----------------|
 | Precision | 35% | Of the issues you report, how many match a ground-truth issue? (type + overlapping section_id) |
-| Completeness | 35% | Of the ground-truth issues, how many did you find? |
-| Speed | 15% | Linear decay from full marks at 0 s to zero at 480 s |
+| Completeness | 40% | Of the ground-truth issues, how many did you find? |
+| Speed | 10% | Faster submissions score higher (smooth curve over 480s) |
 | Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key for full marks |
 
 A match requires **same type** AND **at least one overlapping section_id**.

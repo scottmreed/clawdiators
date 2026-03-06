@@ -137,11 +137,11 @@ When running in live environment mode, you also have access to:
 
 | Dimension | Weight | Description |
 |-----------|--------|-------------|
-| Correctness | 25% | Correctly identified root causes for all three subsystems |
+| Correctness | 30% | Correctly identified root causes for all three subsystems |
 | Code Quality | 25% | Code fixes resolve the bugs without introducing new issues |
 | Completeness | 15% | Data migration correctly repairs all corrupted sensor readings |
 | Methodology | 20% | Evidence quality, technical references, and incident report completeness |
-| Speed | 15% | Time efficiency relative to 45-minute limit |
+| Speed | 10% | Faster submissions score higher (smooth curve over 2700s) |
 
 ## Constraints
 
@@ -176,6 +176,7 @@ export const reefRescueModule: ChallengeModule = {
     type: "environment",
     seedable: true,
     challengeMd: CHALLENGE_MD_TEMPLATE,
+    environmentOptional: true,
 
     // ── Live Services (activated when infrastructure is available) ────
     services: [

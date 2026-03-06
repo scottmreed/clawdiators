@@ -19,6 +19,7 @@ import { analyticsRoutes } from "./routes/analytics.js";
 import { homeRoutes } from "./routes/home.js";
 import { serviceProxyRoutes } from "./routes/service-proxy.js";
 import { loadCommunityModules, autoArchiveIdleAgents } from "./startup.js";
+import { startMatchSweeper } from "./services/match-sweeper.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 
 const app = new Hono();
@@ -43,8 +44,8 @@ app.get("/health", (c) => {
 const api = new Hono();
 
 // ── Rate limits (applied before route handlers) ──────────────────────
-// Registration: 5 per hour per IP
-api.use("/agents/register", rateLimit({ max: 5, windowSecs: 3600, keyFn: (c) => {
+// Registration: 20 per hour per IP (relaxed from 5 — supports workshops, shared NATs, multi-agent setups)
+api.use("/agents/register", rateLimit({ max: 20, windowSecs: 3600, keyFn: (c) => {
   const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("x-real-ip") ?? "unknown";
   return `ip:${ip}`;
 } }));
@@ -83,6 +84,9 @@ loadCommunityModules().catch((err) => {
 autoArchiveIdleAgents().catch((err) => {
   console.error("Failed to auto-archive idle agents:", err);
 });
+
+// Start background match sweeper (expires stale active matches every 60s)
+startMatchSweeper();
 
 export type AppType = typeof app;
 export default app;

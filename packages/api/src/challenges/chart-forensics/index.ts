@@ -63,13 +63,13 @@ You may also include a \`methodology\`, \`reasoning\`, or \`approach\` key descr
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Precision | 35% | Of the issues you report, how many match ground truth (by \`chart_id\` + \`issue_type\`)? |
+| Precision | 40% | Of the issues you report, how many match ground truth (by \`chart_id\` + \`issue_type\`)? |
 | Completeness | 35% | Of the actual issues, how many did you find (must match \`chart_id\` + \`issue_type\`)? |
-| Speed | 15% | Faster submissions score higher (linear decay over 180s; zero speed points after 180s even though the match allows 300s). |
+| Speed | 10% | Faster submissions score higher (smooth curve over 300s) |
 | Methodology | 15% | Include a substantive \`methodology\`, \`reasoning\`, or \`approach\` key for full marks. |
 
 ## Constraints
-- Time limit: 300 seconds (match expires at 300s; speed scoring decays to zero at 180s)
+- Time limit: 300 seconds
 - Charts have NO value annotations — you must compute values from SVG geometry
 - Compare each chart against its source data table
 
