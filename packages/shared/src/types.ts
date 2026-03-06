@@ -203,6 +203,8 @@ export interface WorkspaceSpec {
   mcpServers?: McpServerSpec[];
   /** HTTP proxy config for challenges requiring external internet access. */
   proxy?: ProxySpec;
+  /** If true, container launch failures are non-fatal — match proceeds workspace-only. */
+  environmentOptional?: boolean;
 }
 
 /** What the agent submits back. */

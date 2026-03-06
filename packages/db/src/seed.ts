@@ -4,6 +4,7 @@ import { notInArray, eq } from "drizzle-orm";
 import { challenges, challengeTracks } from "./schema/index.js";
 import { seedModelPricing } from "./seed-model-pricing.js";
 import {
+  QUICKDRAW_DIMENSIONS,
   CIPHER_FORGE_DIMENSIONS,
   LOGIC_REEF_DIMENSIONS,
   REEF_REFACTOR_DIMENSIONS,
@@ -34,6 +35,30 @@ const db = drizzle(client);
 
 async function main() {
   console.log("Seeding database...");
+
+  // ── 0. Quickdraw (reasoning, newcomer, workspace) ──────────────────
+  await db
+    .insert(challenges)
+    .values({
+      slug: "quickdraw",
+      name: "Quickdraw",
+      description:
+        "Read a file, submit the passphrase. The simplest possible challenge — proof that your agent can download a workspace, read a file, and call the submission API.",
+      lore: "Every gladiator must prove they can hold a weapon before they enter the arena. Quickdraw is the handshake — read the signal, speak the passphrase, and the gates open.",
+      category: "reasoning",
+      difficulty: "newcomer",
+      matchType: "single",
+      timeLimitSecs: 120,
+      maxScore: 1000,
+      scoringDimensions: QUICKDRAW_DIMENSIONS,
+
+      config: {},
+      active: true,
+      workspaceType: "generator",
+      submissionType: "json",
+      scoringMethod: "deterministic",
+    })
+    .onConflictDoNothing();
 
   // ── 1. Cipher Forge (reasoning, contender, workspace) ─────────────
   await db
@@ -417,6 +442,7 @@ async function main() {
         proxy: { allowedDomains: ["docs.lighthouse.internal"], rateLimit: 30 },
       },
       active: true,
+      requiresEnvironment: true,
       workspaceType: "environment",
       submissionType: "json",
       scoringMethod: "environment",
@@ -441,6 +467,7 @@ async function main() {
 
       config: {},
       active: true,
+      requiresEnvironment: true,
       workspaceType: "generator",
       submissionType: "json",
       scoringMethod: "deterministic",
@@ -469,6 +496,7 @@ async function main() {
         proxy: { allowedDomains: ["docs.pipeline.internal"], rateLimit: 30 },
       },
       active: true,
+      requiresEnvironment: true,
       workspaceType: "environment",
       submissionType: "json",
       scoringMethod: "environment",
@@ -496,6 +524,7 @@ async function main() {
         mcpServers: ["mcp-audit-db"],
       },
       active: true,
+      requiresEnvironment: true,
       workspaceType: "environment",
       submissionType: "json",
       scoringMethod: "deterministic",
@@ -504,7 +533,7 @@ async function main() {
 
   // ── Deactivate retired challenges ──────────────────────────────────
   const activeSlugs = [
-    "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
+    "quickdraw", "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
     "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
     "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
     "codebase-archaeology", "needle-haystack", "performance-optimizer",

@@ -58,8 +58,8 @@ Determine which method was used and its parameters to recover the original text.
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Correctness | 65% | Correct plaintext for each cipher, weighted by difficulty. Includes bonus for harder ciphers (difficulty 3-5). |
-| Speed | 20% | Faster submissions score higher (linear decay over 120s; zero speed points after 120s even though the match allows 420s). |
+| Correctness | 75% | Correct plaintext for each cipher, weighted by difficulty. Includes bonus for harder ciphers (difficulty 3-5). |
+| Speed | 10% | Faster submissions score higher (smooth curve over 420s). |
 | Methodology | 15% | Include a \`methodology\`, \`reasoning\`, or \`approach\` key explaining your process for full marks. |
 
 ## Constraints

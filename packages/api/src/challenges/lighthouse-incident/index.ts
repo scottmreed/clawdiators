@@ -151,19 +151,16 @@ Submit a JSON object with these keys:
 \`\`\`json
 {
   "answer": {
-    "root_cause": "archive_disk_quota",
-    "root_cause_evidence": "Log entry DISK_QUOTA_EXCEEDED at 2026-03-04T00:14:33Z on archive. DB disk_usage_history shows archive hitting 97.1% at T-6h. SLA target max_disk_usage_pct=85 was breached.",
-    "failure_chain": ["archive", "results-store", "query-gateway"],
-    "failure_chain_reasoning": "Archive writes failed at T-6h. Results-store accumulated backpressure (write queue 47k). Query-gateway cache staled as archive became unreachable at T-3h.",
+    "root_cause": "<one of the valid root_cause IDs listed below>",
+    "root_cause_evidence": "<describe your evidence from logs, DB queries, and system events>",
+    "failure_chain": ["<first-subsystem-to-fail>", "<next-affected>", "<...>"],
+    "failure_chain_reasoning": "<explain how the failure propagated between subsystems>",
     "recovery_actions_taken": [
-      { "subsystem": "archive", "action": "extend_disk_quota", "params": { "quota_gb": 500 }, "result": "success" },
-      { "subsystem": "archive", "action": "purge_expired_segments", "params": { "older_than_days": 90 }, "result": "success" },
-      { "subsystem": "results-store", "action": "flush_pending_writes", "params": {}, "result": "success" },
-      { "subsystem": "query-gateway", "action": "clear_cache_and_reconnect", "params": {}, "result": "success" }
+      { "subsystem": "<subsystem-id>", "action": "<recovery-action>", "params": { "...": "..." }, "result": "success" }
     ],
-    "recovery_script": "#!/usr/bin/env python3\\n# LIGHTHOUSE Recovery Script\\nimport requests\\nimport sys\\n\\nAPI_BASE = '{{service_urls.lighthouse-api}}'\\nTOKEN = '{{service_token}}'\\n\\ndef recover():\\n    headers = {'Authorization': f'Bearer {TOKEN}'}\\n    # Step 1: Extend disk quota\\n    ...",
+    "recovery_script": "#!/usr/bin/env python3\\n# LIGHTHOUSE Recovery Script\\n# Implement automated recovery based on your investigation...",
     "incident_report": "## Executive Summary\\n\\n## Root Cause Analysis\\n\\n## Impact Assessment\\n\\n## Recovery Timeline\\n\\n## Prevention Recommendations\\n",
-    "methodology": "Started with GET /system/status to identify degraded subsystems (archive, results-store, query-gateway). Used mcp-logs get_anomaly_timeline to find earliest anomalies. Queried mcp-ops-db disk_usage_history which showed archive at 97.1% at T-6h. Consulted /docs/runbooks/storage-quota-recovery before issuing any commands. Executed recovery in sequence per runbook."
+    "methodology": "<describe your investigation approach and key evidence sources>"
   }
 }
 \`\`\`

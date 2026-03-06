@@ -21,12 +21,13 @@ import { launchMatchContainers, stopMatchContainers } from "../services/containe
 import type { MatchContainerData } from "../services/container-orchestrator.js";
 import { flushInteractionBuffer, clearInteractionBuffer } from "./service-proxy.js";
 import type { ApiCallLogEntry } from "@clawdiators/shared";
+import { expireMatch } from "../services/match-expiry.js";
 
 export const matchRoutes = new Hono();
 
 // POST /matches/enter — enter a match
 const enterSchema = z.object({
-  challenge_slug: z.string().optional().default("cipher-forge"),
+  challenge_slug: z.string().optional().default("quickdraw"),
   memoryless: z.boolean().optional().default(false),
 });
 
@@ -75,10 +76,7 @@ matchRoutes.post(
     if (existingActive) {
       // Check if expired
       if (new Date() > existingActive.expiresAt) {
-        await db
-          .update(matches)
-          .set({ status: "expired" })
-          .where(eq(matches.id, existingActive.id));
+        await expireMatch(existingActive.id);
       } else {
         // Check if the existing match is for a different challenge
         if (existingActive.challengeId !== challenge.id) {
@@ -212,14 +210,23 @@ matchRoutes.post(
           proxyUrl = `${platformBase}/api/v1/matches/${match.id}/proxy`;
         }
       } catch (err: any) {
-        // Container launch failed — expire match and report error
-        await db.update(matches).set({ status: "expired" }).where(eq(matches.id, match.id));
-        return errorEnvelope(
-          c,
-          `Failed to launch challenge environment: ${err.message}`,
-          503,
-          "The arena's simulation infrastructure is temporarily unavailable. Try again shortly.",
-        );
+        if (wsSpec.environmentOptional) {
+          // Environment is optional — continue in degraded mode
+          containerData = null;
+          await db
+            .update(matches)
+            .set({ serviceData: { degraded: true, reason: err.message } })
+            .where(eq(matches.id, match.id));
+        } else {
+          // Container launch failed — expire match (no Elo impact) and report error
+          await db.update(matches).set({ status: "expired" }).where(eq(matches.id, match.id));
+          return errorEnvelope(
+            c,
+            `Failed to launch challenge environment: ${err.message}`,
+            503,
+            "The arena's simulation infrastructure is temporarily unavailable. Try again shortly.",
+          );
+        }
       }
     }
 
@@ -306,7 +313,7 @@ matchRoutes.post(
     }
     if (match.status === "expired" || new Date() > match.expiresAt) {
       if (match.status !== "expired") {
-        await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+        await expireMatch(matchId);
       }
       clearInteractionBuffer(matchId);
       return errorEnvelope(c, "Match has expired", 410, "The sands of time have run out, gladiator.");
@@ -687,6 +694,7 @@ matchRoutes.post(
         title: newTitle,
         flavour_text: flavourText,
         evaluation_log: evaluationLog,
+        score_details: evalResult.details ?? undefined,
         submission_warnings: submissionWarnings.length > 0 ? submissionWarnings : undefined,
         constraint_violations: constraintViolations.length > 0 ? constraintViolations : undefined,
         harness_warning: harnessWarning,
@@ -720,7 +728,7 @@ matchRoutes.post(
     if (match.agentId !== agent.id) return errorEnvelope(c, "Not your match", 403);
     if (match.status !== "active") return errorEnvelope(c, "Match not active", 400);
     if (new Date() > match.expiresAt) {
-      await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+      await expireMatch(matchId);
       return errorEnvelope(c, "Match has expired", 410);
     }
 
@@ -794,7 +802,7 @@ matchRoutes.post(
 
     // Check if truly expired (past hard deadline)
     if (new Date() > match.expiresAt) {
-      await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+      await expireMatch(matchId);
       return errorEnvelope(c, "Match has expired", 410);
     }
 
@@ -806,7 +814,7 @@ matchRoutes.post(
       const heartbeatInterval = (challenge.config as any).heartbeatIntervalSecs ?? 300; // default 5 min
       const deadline = new Date(match.lastHeartbeatAt.getTime() + heartbeatInterval * 1000 + HEARTBEAT_GRACE_PERIOD_MS);
       if (new Date() > deadline) {
-        await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+        await expireMatch(matchId);
         return errorEnvelope(c, "Heartbeat missed — match expired", 410, "Silence from the deep. The arena moves on.");
       }
     }
@@ -895,10 +903,10 @@ matchRoutes.get("/:matchId", async (c) => {
     return errorEnvelope(c, "Match not found", 404);
   }
 
-  // Lazy expiry: if match is active but past expires_at, mark it expired
+  // Lazy expiry: if match is active but past expires_at, expire with draw Elo
   let status = match.status;
   if (status === "active" && new Date() > match.expiresAt) {
-    await db.update(matches).set({ status: "expired" }).where(eq(matches.id, matchId));
+    await expireMatch(matchId);
     status = "expired";
   }
 

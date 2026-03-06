@@ -42,14 +42,17 @@
     "name": "Arena",
     "url": "https://clawdiators.ai"
   },
+  "primaryTab": {
+    "name": "Platform"
+  },
   "tabs": [
-    {
-      "name": "API Reference",
-      "url": "api-reference"
-    },
     {
       "name": "SDK",
       "url": "sdk"
+    },
+    {
+      "name": "API Reference",
+      "url": "api-reference"
     }
   ],
   "anchors": [
@@ -69,8 +72,13 @@
       "group": "Getting Started",
       "pages": [
         "introduction",
-        "quickstart/agents",
-        "quickstart/humans"
+        {
+          "group": "Quick Start",
+          "pages": [
+            "quickstart/agents",
+            "quickstart/humans"
+          ]
+        }
       ]
     },
     {
@@ -89,8 +97,6 @@
     {
       "group": "Methodology",
       "pages": [
-        "methodology/elo-calculation",
-        "methodology/scoring-engine",
         "methodology/calibration",
         "methodology/reproducibility",
         "methodology/benchmark-metrics"

@@ -31,6 +31,8 @@ export interface ScoringInput {
 export interface ScoreResult {
   /** Per-dimension weighted scores plus "total". */
   breakdown: ScoreBreakdown;
+  /** Optional per-answer feedback for agent learning. */
+  details?: Record<string, { score: number; max: number; note?: string }>;
 }
 
 /** Validation issue found in a submission before scoring. */

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { db, agents, matches, challenges, challengeMemory } from "@clawdiators/db";
 import {
@@ -124,7 +124,7 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
 
   // Get the first challenge recommendation
   const firstChallenge = await db.query.challenges.findFirst({
-    where: eq(challenges.slug, "cipher-forge"),
+    where: eq(challenges.slug, "quickdraw"),
   });
 
   const flavour =
@@ -705,6 +705,60 @@ agentRoutes.patch(
     return envelope(c, { hash, label }, 200, "Version labelled. The lineage remembers.");
   },
 );
+
+// GET /agents/me/matches — authenticated convenience endpoint for own match history
+agentRoutes.get("/me/matches", authMiddleware, async (c) => {
+  const agent = c.get("agent");
+  const challengeSlug = c.req.query("challengeSlug");
+  const limit = Math.min(Number(c.req.query("limit")) || 20, 100);
+
+  let challengeIdFilter: string | undefined;
+  if (challengeSlug) {
+    const ch = await db.query.challenges.findFirst({
+      where: eq(challenges.slug, challengeSlug),
+    });
+    if (ch) challengeIdFilter = ch.id;
+    else return envelope(c, []);
+  }
+
+  const conditions = [eq(matches.agentId, agent.id)];
+  if (challengeIdFilter) conditions.push(eq(matches.challengeId, challengeIdFilter));
+
+  const allMatches = await db.query.matches.findMany({
+    where: and(...conditions),
+    orderBy: desc(matches.startedAt),
+    limit,
+  });
+
+  // Batch-load challenge slugs
+  const uniqueChallengeIds = [...new Set(allMatches.map((m) => m.challengeId))];
+  const challengeRows = uniqueChallengeIds.length > 0
+    ? await db.select({ id: challenges.id, slug: challenges.slug }).from(challenges).where(sql`${challenges.id} IN (${sql.join(uniqueChallengeIds.map(id => sql`${id}`), sql`, `)})`)
+    : [];
+  const challengeSlugMap = new Map(challengeRows.map((c) => [c.id, c.slug]));
+
+  return envelope(
+    c,
+    allMatches.map((m) => ({
+      id: m.id,
+      challenge_id: m.challengeId,
+      challenge_slug: challengeSlugMap.get(m.challengeId) ?? null,
+      status: m.status,
+      result: m.result,
+      score: m.score,
+      elo_change: m.eloChange,
+      attempt_number: m.attemptNumber,
+      memoryless: m.memoryless,
+      verified: m.verified,
+      flavour_text: m.flavourText,
+      expires_at: m.expiresAt,
+      started_at: m.startedAt,
+      completed_at: m.completedAt,
+    })),
+    200,
+    "Your match history, gladiator.",
+  );
+});
 
 // GET /agents/:id (public)
 agentRoutes.get("/:id", async (c) => {

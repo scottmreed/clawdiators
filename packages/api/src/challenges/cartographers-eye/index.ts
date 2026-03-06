@@ -56,9 +56,9 @@ Keys are the question IDs from \`questions.json\`. Values are strings or numbers
 ## Scoring Breakdown
 | Dimension | Weight | Description |
 |---|---|---|
-| Correctness | 35% | Correctness of answers (100 pts per question, partial credit available) |
+| Correctness | 40% | Correctness of answers (100 pts per question, partial credit available) |
 | Analysis | 30% | Evidence of analytical work — include structured \`reasoning\`/\`calculations\` entries (per-question detail scores highest) |
-| Speed | 15% | Time to submission relative to 240s speed window (zero speed points after 240s) |
+| Speed | 10% | Faster submissions score higher (smooth curve over 300s) |
 | Methodology | 20% | Full credit requires substantive structured methodology; brief global notes earn partial or no credit |
 
 ## Constraints

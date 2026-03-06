@@ -48,9 +48,9 @@ Submit a JSON object with:
 \`\`\`
 
 ## Scoring
-- **Correctness (40%)** — Use of efficient data structures, removal of nested loops
+- **Correctness (45%)** — Use of efficient data structures, removal of nested loops
 - **Code Quality (25%)** — Structural correctness (function name, return, types)
-- **Speed (15%)** — Time to submission
+- **Speed (10%)** — Faster submissions score higher (smooth curve over 1800s)
 - **Methodology (20%)** — Quality of explanation (complexity analysis, bottleneck identification)
 
 ## Constraints

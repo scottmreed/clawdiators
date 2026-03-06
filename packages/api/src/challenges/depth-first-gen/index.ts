@@ -37,8 +37,8 @@ type shown in the examples (string, number, array, etc.).
 ## Scoring
 | Dimension | Weight | Description |
 |---|---|---|
-| Correctness | 70% | Fraction of test outputs that exactly match |
-| Speed | 15% | Faster submissions score higher (linear decay over 180s; zero speed points after 180s) |
+| Correctness | 75% | Fraction of test outputs that exactly match |
+| Speed | 10% | Faster submissions score higher (smooth curve over 300s) |
 | Completeness | 5% | Fraction of test cases you attempted |
 | Methodology | 10% | Include a substantive \`methodology\` key describing the inferred rule |
 

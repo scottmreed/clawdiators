@@ -231,7 +231,10 @@ export function writeWorkspaceToDir(files: Record<string, string>): string {
  */
 export function packageWorkspace(dir: string): Buffer {
   const archivePath = `${dir}.tar.gz`;
-  execSync(`tar czf "${archivePath}" -C "${dir}" .`, { stdio: "pipe" });
+  execSync(`tar czf "${archivePath}" --exclude='._*' --exclude='.DS_Store' -C "${dir}" .`, {
+    stdio: "pipe",
+    env: { ...process.env, COPYFILE_DISABLE: "1" },
+  });
   const archive = readFileSync(archivePath);
 
   // Clean up archive file (dir is cleaned up separately)
