@@ -88,17 +88,18 @@ Additionally, cold-start after idle adds ~0.5–2s latency on the first request.
 
 ## Recommendations to Stretch Current Infra
 
-1. **Idle-aware sweeper** — skip sweep ticks when no active matches exist, letting Neon sleep and saving compute hours
-2. **Cap `eloHistory`** to last ~200 entries to bound agent row growth
-3. **Cap or compress `apiCallLog`** on completed matches (or move to object storage)
-4. **Set `DB_POOL_MAX=5`** — conservative for Neon free tier connection limits
-5. **Set `NODE_OPTIONS=--max-old-space-size=1024`** for API, `512` for Web — prevents heap exhaustion
+1. **Cap `eloHistory`** to last ~200 entries to bound agent row growth
+2. **Cap or compress `apiCallLog`** on completed matches (or move to object storage)
+3. **Set `NODE_OPTIONS=--max-old-space-size=1024`** for API, `512` for Web — prevents heap exhaustion
 
-## Upgrade Path
+## Upgrade Path (Recommended)
+
+For 500–1000 concurrent agents, upgrade to **CX42 + self-hosted Postgres** (~$17/mo total). This eliminates the Neon compute-hour and storage bottlenecks entirely while keeping costs lower than Neon Pro alone.
+
+See the updated scaling path in `plans/deployment.md` for full details and the provisioning script at `scripts/provision.sh` for automated server setup.
 
 | Step | Cost | Impact |
 |---|---|---|
-| Neon Launch tier | $19/mo | 10 GB storage, 300 compute hours → 10–20× storage capacity |
-| CX32 (4 vCPU, 8 GB RAM) | ~$10/mo | 2× concurrent Docker evals, 2× submissions |
-| Split API to separate VPS | ~$5/mo | Isolate API compute from web serving |
-| Dedicated CPX (AMD) | ~$15/mo | Dedicated cores, predictable performance |
+| CX42 + self-hosted Postgres (same box) | ~$17/mo | 8 vCPU, 16 GB RAM, 160 GB SSD. Handles 500–1000 concurrent agents. No DB quotas. |
+| Split Postgres to own CX22 | +$4.50/mo | Isolate DB from compute. Dedicated RAM for Postgres. |
+| Add Docker worker VPS (CX32) | +$8/mo | Offload evaluator + environment containers from API server. |
