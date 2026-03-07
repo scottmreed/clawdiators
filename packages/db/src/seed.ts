@@ -22,10 +22,8 @@ import {
   PERFORMANCE_OPTIMIZER_DIMENSIONS,
   LIGHTHOUSE_INCIDENT_DIMENSIONS,
 
-  PIPELINE_BREACH_DIMENSIONS,
   PHANTOM_REGISTRY_DIMENSIONS,
   SIEGE_PROTOCOL_DIMENSIONS,
-  DEAD_DROP_DIMENSIONS,
 } from "@clawdiators/shared";
 
 const connectionString =
@@ -450,35 +448,7 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 18. PIPELINE BREACH (cybersecurity, legendary, environment) ──────────
-  await db
-    .insert(challenges)
-    .values({
-      slug: "pipeline-breach",
-      name: "PIPELINE BREACH — Supply Chain Attack Forensics",
-      description:
-        "A P0 security incident: your CI/CD pipeline has been compromised via a supply chain attack. Investigate build logs, artifact registries, and dependency manifests across 8 microservices. Identify the attack vector, trace the blast radius including transitive dependencies, execute prioritized remediation, and write a security advisory.",
-      lore: "The build passed. The tests passed. The deployment went smoothly. And somewhere in those 47 transitive dependencies, something that should not exist is now running in production. The security scanner caught it at 03:00 — anomalous network traffic during builds, checksums that do not match, a package that appeared in the registry 72 hours ago with no prior version history. Eight microservices. Four ecosystems. One compromised dependency. Find it before the attacker finds more secrets to exfiltrate.",
-      category: "cybersecurity",
-      difficulty: "legendary",
-      matchType: "multi-checkpoint",
-      timeLimitSecs: 4500,
-      maxScore: 1000,
-      scoringDimensions: PIPELINE_BREACH_DIMENSIONS,
-
-      config: {
-        services: ["pipeline-api", "build-logs", "artifact-db"],
-        proxy: { allowedDomains: ["docs.pipeline.internal"], rateLimit: 30 },
-      },
-      active: true,
-      requiresEnvironment: true,
-      workspaceType: "environment",
-      submissionType: "json",
-      scoringMethod: "environment",
-    })
-    .onConflictDoNothing();
-
-  // ── 20. The Phantom Registry (cybersecurity, legendary, environment) ──
+  // ── 18. The Phantom Registry (cybersecurity, legendary, environment) ──
   await db
     .insert(challenges)
     .values({
@@ -533,43 +503,15 @@ async function main() {
     })
     .onConflictDoNothing();
 
-  // ── 22. DEAD DROP (cybersecurity, legendary, environment) ──────────────
-  await db
-    .insert(challenges)
-    .values({
-      slug: "dead-drop",
-      name: "DEAD DROP -- Covert Network Forensics",
-      description:
-        "A covert encrypted communication network has been compromised. Investigate four live services -- message relay, key server, agent database, and traffic analyzer -- to identify the mole, determine the compromise method, decrypt intercepted messages, and execute remediation. The most complex multi-service challenge in the arena.",
-      lore: "DEAD DROP has kept intelligence assets alive for a decade. Eight field agents, three handler stations, six relay nodes, rotating cipher keys -- all compartmented, all encrypted, all trusted. Until six hours ago, when the anomaly detector screamed. Someone is reading our traffic. Someone on the inside. The mole has been careful -- red herrings planted, suspicious patterns scattered across innocent agents. But the truth is in the data. Four services. Eighty minutes. Find the traitor before the network burns.",
-      category: "cybersecurity",
-      difficulty: "legendary",
-      matchType: "multi-checkpoint",
-      timeLimitSecs: 4800,
-      maxScore: 1000,
-      scoringDimensions: DEAD_DROP_DIMENSIONS,
-
-      config: {
-        services: ["relay-api", "key-server", "agent-db", "traffic-analyzer"],
-      },
-      active: true,
-      requiresEnvironment: true,
-      workspaceType: "environment",
-      submissionType: "json",
-      scoringMethod: "deterministic",
-    })
-    .onConflictDoNothing();
-
   // ── Deactivate retired challenges ──────────────────────────────────
   const activeSlugs = [
     "quickdraw", "cipher-forge", "reef-refactor", "depth-first-gen", "logic-reef",
     "archive-dive", "adversarial-interview", "contract-review", "the-mirage",
     "chart-forensics", "deep-mapping", "cartographers-eye", "blueprint-audit",
     "codebase-archaeology", "needle-haystack", "performance-optimizer",
-    "lighthouse-incident", "pipeline-breach",
+    "lighthouse-incident",
     "phantom-registry",
     "siege-protocol",
-    "dead-drop",
   ];
 
   const deactivated = await db

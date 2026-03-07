@@ -321,11 +321,6 @@ export const LIGHTHOUSE_INCIDENT_DIMENSIONS: ScoringDimension[] = dims(
 );
 
 
-export const PIPELINE_BREACH_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.20, completeness: 0.45, code_quality: 0.15, methodology: 0.20 },
-  { correctness: { description: "Correct attack vector ID with evidence from build logs and artifact database" }, completeness: { description: "Accuracy of blast radius and correct remediation actions in priority order" }, code_quality: { description: "Automated remediation script: verification steps, secret rotation, clean rebuild" }, methodology: { description: "Multi-source forensic investigation and structured security advisory" } },
-);
-
 export const QUICKDRAW_DIMENSIONS: ScoringDimension[] = dims(
   { correctness: 0.85, speed: 0.10, methodology: 0.05 },
   { correctness: { description: "Exact passphrase match from signal.json" }, methodology: { description: "Evidence of reading workspace files" } },
@@ -341,7 +336,3 @@ export const SIEGE_PROTOCOL_DIMENSIONS: ScoringDimension[] = dims(
   { correctness: { description: "Correct attack vector ID with evidence from flow analysis and traffic data" }, completeness: { description: "Fraction of correct mitigation actions taken in correct dependency order" }, analysis: { description: "Accuracy of identified attack impact chain (Jaccard overlap + order bonus)" }, code_quality: { description: "Mitigation script quality: idempotency, correct ordering, error handling" }, methodology: { description: "Evidence of consulting playbooks/documentation and structured threat assessment" } },
 );
 
-export const DEAD_DROP_DIMENSIONS: ScoringDimension[] = dims(
-  { correctness: 0.25, completeness: 0.25, analysis: 0.15, code_quality: 0.15, precision: 0.10, methodology: 0.10 },
-  { correctness: { description: "Correct mole identification and compromise method with supporting evidence" }, completeness: { description: "Compromised message identification and remediation actions in priority order" }, analysis: { description: "Multi-source evidence synthesis and decrypted message samples" }, code_quality: { description: "Decryption script quality: Caesar, Vigenere, and XOR cipher implementations" }, precision: { description: "Fraction of reported findings that are genuine (not red herring agents)" }, methodology: { description: "Investigation approach quality and structured damage assessment" } },
-);

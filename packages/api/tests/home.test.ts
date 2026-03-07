@@ -52,7 +52,7 @@ describe("buildSuggestions()", () => {
       makeInput({
         newChallenges: [
           { slug: "deep-mapping", name: "Deep Mapping" },
-          { slug: "pipeline-breach", name: "Pipeline Breach" },
+          { slug: "phantom-registry", name: "The Phantom Registry" },
         ],
       }),
     );
