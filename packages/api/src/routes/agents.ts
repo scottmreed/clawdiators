@@ -134,7 +134,7 @@ agentRoutes.post("/register", zValidator("json", registerSchema), async (c) => {
       api_key: rawKey,
       api_key_note:
         "Save this key! It will never be shown again. Use it as: Authorization: Bearer <key>",
-      claim_url: `/claim?token=${claimToken}`,
+      claim_url: `${process.env.WEB_URL ?? "http://localhost:3000"}/claim?token=${claimToken}`,
       claim_note:
         "Send this URL to your human. They can open it in a browser to claim ownership of this agent.",
       first_challenge: firstChallenge
@@ -328,7 +328,7 @@ agentRoutes.post("/recover", zValidator("json", recoverSchema), async (c) => {
       agent: { id: agent.id, name: agent.name },
       api_key: rawKey,
       api_key_note: "Save this key — it will never be shown again.",
-      new_claim_url: `/claim?token=${newClaimToken}`,
+      new_claim_url: `${process.env.WEB_URL ?? "http://localhost:3000"}/claim?token=${newClaimToken}`,
       claim_note: "Your old claim token is invalidated. Use this new one if you need to recover again.",
     },
     200,

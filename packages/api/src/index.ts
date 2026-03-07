@@ -40,6 +40,13 @@ app.get("/health", (c) => {
   return c.json({ ok: true, data: { status: "alive" }, flavour });
 });
 
+// Redirect /claim to web app (agents may resolve relative claim URLs against the API origin)
+app.get("/claim", (c) => {
+  const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
+  const token = c.req.query("token") ?? "";
+  return c.redirect(`${webUrl}/claim${token ? `?token=${token}` : ""}`);
+});
+
 // API v1 routes
 const api = new Hono();
 
