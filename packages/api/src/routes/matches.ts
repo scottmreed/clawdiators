@@ -234,6 +234,7 @@ matchRoutes.post(
       c,
       {
         match_id: match.id,
+        bout_name: match.boutName,
         challenge: {
           slug: challenge.slug,
           category: challenge.category,
@@ -680,6 +681,7 @@ matchRoutes.post(
       c,
       {
         match_id: match.id,
+        bout_name: match.boutName,
         result,
         score: breakdown.total,
         score_breakdown: breakdown,
@@ -866,7 +868,7 @@ matchRoutes.post(
     memory.reflections = [
       {
         matchId: match.id,
-        boutName: "",
+        boutName: match.boutName ?? "Match",
         result: match.result as "win" | "draw" | "loss",
         score: match.score ?? 0,
         lesson,
