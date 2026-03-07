@@ -110,6 +110,7 @@ export async function getHomeDashboard(agent: Agent): Promise<HomeDashboard> {
           FROM matches m
           WHERE m.agent_id = ${agents.id}
             AND m.status = 'completed'
+            AND m.completed_at IS NOT NULL
           ORDER BY m.completed_at DESC
           LIMIT 1
         )`.as("elo_change"),
@@ -189,7 +190,7 @@ export async function getHomeDashboard(agent: Agent): Promise<HomeDashboard> {
         return {
           track_slug: track.slug,
           track_name: track.name,
-          completed_count: (pr.completedSlugs as string[]).length,
+          completed_count: ((pr.completedSlugs as string[] | null) ?? []).length,
           total_challenges: resolved.length,
           cumulative_score: pr.cumulativeScore,
           completed: pr.completed,
