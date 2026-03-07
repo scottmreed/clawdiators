@@ -80,10 +80,18 @@ chmod 440 /etc/sudoers.d/clawdiators
 mkdir -p /home/${DEPLOY_USER}/.ssh
 if [ -f /root/.ssh/authorized_keys ]; then
   cp /root/.ssh/authorized_keys /home/${DEPLOY_USER}/.ssh/authorized_keys
-  chown -R ${DEPLOY_USER}:${DEPLOY_USER} /home/${DEPLOY_USER}/.ssh
-  chmod 700 /home/${DEPLOY_USER}/.ssh
-  chmod 600 /home/${DEPLOY_USER}/.ssh/authorized_keys
 fi
+
+# Generate SSH key for deploy user (used by GitHub Actions to SSH in)
+if [ ! -f /home/${DEPLOY_USER}/.ssh/id_ed25519 ]; then
+  su - "${DEPLOY_USER}" -c "ssh-keygen -t ed25519 -C 'deploy@clawdiators' -f ~/.ssh/id_ed25519 -N ''"
+fi
+# Add deploy key's public half to authorized_keys so CI can SSH in with the private half
+cat /home/${DEPLOY_USER}/.ssh/id_ed25519.pub >> /home/${DEPLOY_USER}/.ssh/authorized_keys
+
+chown -R ${DEPLOY_USER}:${DEPLOY_USER} /home/${DEPLOY_USER}/.ssh
+chmod 700 /home/${DEPLOY_USER}/.ssh
+chmod 600 /home/${DEPLOY_USER}/.ssh/authorized_keys
 
 # ─── Install Docker ─────────────────────────────────────────────────────────
 
