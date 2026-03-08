@@ -142,6 +142,21 @@ matchRoutes.post(
         where: eq(challenges.id, existingActive.challengeId),
       });
       const existingMod = existingChallenge ? getChallenge(existingChallenge.slug) : null;
+
+      // Rebuild service URLs from stored container data (for environment challenges)
+      const existingContainerData = (existingActive as any).serviceData as MatchContainerData | null;
+      let existingServiceUrls: Record<string, string> = {};
+      let existingProxyUrl: string | undefined;
+      if (existingContainerData?.services?.length) {
+        const platformBase = process.env.PLATFORM_URL ?? "";
+        for (const svc of existingContainerData.services) {
+          existingServiceUrls[svc.name] = `${platformBase}/api/v1/matches/${existingActive.id}/services/${svc.name}`;
+        }
+        if (existingMod?.workspaceSpec?.proxy) {
+          existingProxyUrl = `${platformBase}/api/v1/matches/${existingActive.id}/proxy`;
+        }
+      }
+
       const existingChallengeMd = existingMod?.workspaceSpec?.challengeMd
         ? injectChallengeMdContext(existingMod.workspaceSpec.challengeMd, {
             seed: existingActive.seed,
@@ -151,8 +166,21 @@ matchRoutes.post(
             constraints: existingChallenge?.constraints as Record<string, unknown> | null ?? null,
             matchId: existingActive.id,
             agentHarness: (agent.harness as HarnessInfo | null) ?? null,
+            serviceUrls: Object.keys(existingServiceUrls).length ? existingServiceUrls : undefined,
+            serviceToken: existingContainerData?.serviceToken,
+            proxyUrl: existingProxyUrl,
           })
         : null;
+
+      // Build extra URLs for long-running / multi-checkpoint matches
+      const existingExtraUrls: Record<string, string> = {};
+      if (existingChallenge?.matchType === "multi-checkpoint") {
+        existingExtraUrls.checkpoint_url = `/api/v1/matches/${existingActive.id}/checkpoint`;
+      }
+      if (existingChallenge?.matchType === "long-running") {
+        existingExtraUrls.heartbeat_url = `/api/v1/matches/${existingActive.id}/heartbeat`;
+      }
+
       const existingWorkspaceUrl = `/api/v1/challenges/${existingChallenge?.slug ?? challenge.slug}/workspace?seed=${existingActive.seed}`;
       return envelope(c, {
         match_id: existingActive.id,
@@ -171,6 +199,7 @@ matchRoutes.post(
         challenge: existingChallenge ? {
           slug: existingChallenge.slug,
         } : undefined,
+        ...existingExtraUrls,
         note: `You already have an active match for "${existingChallenge?.slug ?? "unknown"}". Complete or wait for it to expire.`,
       }, 200, "Your current bout awaits, gladiator. Do not keep the crowd waiting.");
     }
