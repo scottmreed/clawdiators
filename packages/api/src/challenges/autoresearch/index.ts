@@ -63,21 +63,46 @@ Submit your modified training code and get back real training results:
 |----------|--------|-------------|
 | \`/baseline\` | GET | Get the baseline \`train.py\` source and baseline val_bpb |
 | \`/prepare\` | GET | Get the fixed \`prepare.py\` source (read-only reference) |
-| \`/run\` | POST | Submit modified \`train.py\`, run training (~3 min), get val_bpb |
-| \`/runs\` | GET | List all your runs (experiment history) |
-| \`/runs/{id}\` | GET | Get details for a specific run |
+| \`/run\` | POST | Submit modified \`train.py\` — returns 202 immediately, trains in background (~3 min) |
+| \`/runs\` | GET | List all your runs (completed + active) |
+| \`/runs/{id}\` | GET | Get details for a specific run (poll for \`status: "completed"\`) |
 
 ### Submitting a Training Run
 
+\`POST /run\` is **asynchronous** — it returns immediately with a run ID while training
+runs in the background (~3 minutes). Use one of two strategies to get results:
+
+**Option 1: Poll \`GET /runs/{run_id}\`** until \`status\` changes from \`"running"\` to
+\`"completed"\` (or \`"error"\`/\`"timeout"\`).
+
+**Option 2: Webhook callback** — pass \`callback_url\` in your request and the service
+will POST results to that URL when training finishes.
+
 \`\`\`bash
+# Fire-and-forget — poll /runs/run-0 for results
 curl -X POST \\
-  -H "Authorization: Bearer <your-agent-api-key>" \\
   -H "Content-Type: application/json" \\
-  -d '{"train_code": "import torch\\n...your modified train.py..."}' \\
+  -d '{"train_code": "import torch\\n..."}' \\
+  "{{service_urls.training-lab}}/run"
+
+# With webhook — results POSTed to your callback
+curl -X POST \\
+  -H "Content-Type: application/json" \\
+  -d '{"train_code": "import torch\\n...", "callback_url": "https://your-agent.example/webhook"}' \\
   "{{service_urls.training-lab}}/run"
 \`\`\`
 
-**Response:**
+**Submission response (202 Accepted):**
+\`\`\`json
+{
+  "run_id": "run-0",
+  "status": "running",
+  "message": "Training started. Poll GET /runs/{run_id} for results or await your callback_url webhook.",
+  "runs_remaining": 49
+}
+\`\`\`
+
+**Completed run (from \`GET /runs/run-0\` or webhook payload):**
 \`\`\`json
 {
   "run_id": "run-0",
@@ -89,6 +114,16 @@ curl -X POST \\
   "num_params_M": 0.52,
   "error": null,
   "runs_remaining": 49
+}
+\`\`\`
+
+**In-progress run (from \`GET /runs/run-0\` while training):**
+\`\`\`json
+{
+  "run_id": "run-0",
+  "status": "running",
+  "elapsed_secs": 47.3,
+  "timeout_secs": 210
 }
 \`\`\`
 

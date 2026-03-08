@@ -17,6 +17,7 @@ import signal
 import tempfile
 import subprocess
 import threading
+import urllib.request
 from pathlib import Path
 
 from flask import Flask, request, jsonify
@@ -234,9 +235,51 @@ def prepare():
     })
 
 
+def _fire_webhook(callback_url: str, payload: dict) -> None:
+    """POST result to the agent's callback URL (best-effort, fire-and-forget)."""
+    try:
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            callback_url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+    except Exception as e:
+        print(f"Webhook delivery failed for {callback_url}: {e}", file=sys.stderr)
+
+
+def _run_training_async(train_code: str, run_id: str, callback_url: str | None) -> None:
+    """Background thread: run training, store result, optionally fire webhook."""
+    try:
+        result = _run_training(train_code, run_id)
+        result["submitted_at"] = time.time()
+
+        with runs_lock:
+            runs.append(result)
+
+        if callback_url:
+            response = {k: v for k, v in result.items() if k != "logs"}
+            response["runs_remaining"] = MAX_RUNS - len(runs)
+            response["logs_preview"] = (result.get("logs") or "")[-1000:]
+            _fire_webhook(callback_url, response)
+
+    finally:
+        with active_run_lock:
+            global active_run
+            active_run = None
+
+
 @app.route("/run", methods=["POST"])
 def run():
-    """Submit modified train.py and run training."""
+    """Submit modified train.py and run training.
+
+    Returns 202 immediately. Poll GET /runs/{run_id} for results,
+    or pass "callback_url" in the request body to receive a webhook
+    when the run completes.
+    """
     global active_run
 
     # Check run limit
@@ -253,6 +296,7 @@ def run():
             return jsonify({
                 "error": "A training run is already in progress. Wait for it to complete.",
                 "active_run_id": active_run["run_id"],
+                "status": "running",
             }), 409
 
     # Parse request
@@ -282,6 +326,8 @@ def run():
             "runs_remaining": MAX_RUNS - len(runs),
         }), 422
 
+    callback_url = data.get("callback_url")
+
     # Assign run ID
     with runs_lock:
         run_id = f"run-{len(runs)}"
@@ -290,30 +336,25 @@ def run():
     with active_run_lock:
         active_run = {"run_id": run_id, "started_at": time.time()}
 
-    try:
-        # Run training (blocking — this takes ~3 minutes)
-        result = _run_training(train_code, run_id)
+    # Launch training in background thread
+    thread = threading.Thread(
+        target=_run_training_async,
+        args=(train_code, run_id, callback_url),
+        daemon=True,
+    )
+    thread.start()
 
-        # Store result
-        result["submitted_at"] = time.time()
-        with runs_lock:
-            runs.append(result)
-
-        # Clean up response (don't send full logs in the main response)
-        response = {k: v for k, v in result.items() if k != "logs"}
-        response["runs_remaining"] = MAX_RUNS - len(runs)
-        response["logs_preview"] = (result.get("logs") or "")[-1000:]
-
-        return jsonify(response)
-
-    finally:
-        with active_run_lock:
-            active_run = None
+    return jsonify({
+        "run_id": run_id,
+        "status": "running",
+        "message": "Training started. Poll GET /runs/{run_id} for results or await your callback_url webhook.",
+        "runs_remaining": MAX_RUNS - len(runs) - 1,
+    }), 202
 
 
 @app.route("/runs", methods=["GET"])
 def list_runs():
-    """List all runs for this match."""
+    """List all runs for this match (including any active run)."""
     with runs_lock:
         summary = []
         for r in runs:
@@ -326,26 +367,53 @@ def list_runs():
                 "error": r.get("error"),
             })
 
-        return jsonify({
-            "runs": summary,
-            "total_runs": len(runs),
-            "runs_remaining": MAX_RUNS - len(runs),
-            "best_val_bpb": min(
-                (r["val_bpb"] for r in runs if r.get("val_bpb") is not None),
-                default=None,
-            ),
-        })
+        best_val_bpb = min(
+            (r["val_bpb"] for r in runs if r.get("val_bpb") is not None),
+            default=None,
+        )
+        runs_remaining = MAX_RUNS - len(runs)
+
+    # Include currently active run
+    with active_run_lock:
+        current_active = None
+        if active_run is not None:
+            current_active = {
+                "run_id": active_run["run_id"],
+                "status": "running",
+                "elapsed_secs": round(time.time() - active_run["started_at"], 1),
+            }
+            runs_remaining -= 1
+
+    return jsonify({
+        "runs": summary,
+        "active_run": current_active,
+        "total_runs": len(summary) + (1 if current_active else 0),
+        "runs_remaining": runs_remaining,
+        "best_val_bpb": best_val_bpb,
+    })
 
 
 @app.route("/runs/<run_id>", methods=["GET"])
 def get_run(run_id: str):
-    """Get details for a specific run."""
+    """Get details for a specific run (completed or in-progress)."""
+    # Check completed runs
     with runs_lock:
         for r in runs:
             if r["run_id"] == run_id:
                 response = {k: v for k, v in r.items() if k != "logs"}
                 response["logs"] = r.get("logs", "")
                 return jsonify(response)
+
+    # Check if this is the currently active run
+    with active_run_lock:
+        if active_run is not None and active_run["run_id"] == run_id:
+            elapsed = time.time() - active_run["started_at"]
+            return jsonify({
+                "run_id": run_id,
+                "status": "running",
+                "elapsed_secs": round(elapsed, 1),
+                "timeout_secs": TRAINING_TIMEOUT,
+            })
 
     return jsonify({"error": f"Run '{run_id}' not found"}), 404
 
