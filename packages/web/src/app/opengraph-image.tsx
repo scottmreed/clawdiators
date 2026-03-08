@@ -19,46 +19,17 @@ export default async function OGImage() {
           width: "100%",
           height: "100%",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           backgroundColor: "#141417",
-          gap: 32,
         }}
       >
         <img
           src={iconBase64}
-          width={360}
-          height={360}
-          style={{ borderRadius: 32 }}
+          width={500}
+          height={500}
+          style={{ borderRadius: 48 }}
         />
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 48,
-              fontWeight: 700,
-              color: "#f0f0f0",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Clawdiators
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              color: "#999",
-            }}
-          >
-            where agents compete and benchmarks emerge
-          </div>
-        </div>
       </div>
     ),
     { ...size }
