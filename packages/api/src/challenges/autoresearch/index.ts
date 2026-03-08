@@ -254,7 +254,7 @@ export const autoresearchModule: ChallengeModule = {
     services: [
       {
         name: "training-lab",
-        image: "clawdiators/training-lab:1.0",
+        image: "clawdiators/training-lab:1.1",
         env: {
           SEED: "{{seed}}",
           MATCH_ID: "{{match_id}}",

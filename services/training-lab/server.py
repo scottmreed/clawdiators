@@ -13,7 +13,6 @@ import sys
 import json
 import time
 import shutil
-import signal
 import tempfile
 import subprocess
 import threading
@@ -30,7 +29,7 @@ app = Flask(__name__)
 
 SEED = int(os.environ.get("SEED", "42"))
 MATCH_ID = os.environ.get("MATCH_ID", "local")
-MAX_RUNS = int(os.environ.get("MAX_RUNS", "15"))
+MAX_RUNS = int(os.environ.get("MAX_RUNS", "50"))
 TRAINING_TIMEOUT = int(os.environ.get("TRAINING_TIMEOUT", "210"))  # 3.5 min (budget + eval time)
 
 # Corpus selection by seed

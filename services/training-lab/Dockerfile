@@ -11,10 +11,10 @@
 
 FROM python:3.12-slim
 
-# Install PyTorch CPU-only + Flask
+# Install PyTorch CPU-only + numpy + Flask
 RUN pip install --no-cache-dir \
     torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir flask
+    pip install --no-cache-dir numpy flask
 
 # Copy application files
 WORKDIR /app
