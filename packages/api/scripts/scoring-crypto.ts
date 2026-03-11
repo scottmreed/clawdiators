@@ -329,6 +329,10 @@ function doStatus() {
       const sourceHash = sha256(readFileSync(plainPath));
 
       for (const ext of STUB_EXTS) {
+        // .js stubs are intentionally removed when real .ts files exist
+        // (tsx resolves literal .js before .ts, so stubs would shadow real code)
+        if (ext === ".js" && existsSync(plainPath)) continue;
+
         const stubPath = join(challengesDir, dir, `${baseName}${ext}`);
         if (!existsSync(stubPath)) {
           console.log(`! [STUBS-MISSING] ${dir}/${baseName}${ext}`);
